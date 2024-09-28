@@ -1,0 +1,53 @@
+2024-09-28 16:34:23.550996: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2024-09-28 16:34:23.555170: I tensorflow/tsl/cuda/cudart_stub.cc:28] Could not find cuda drivers on your machine, GPU will not be used.
+2024-09-28 16:34:23.621894: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2024-09-28 16:34:24.508524: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+train:   0%|          | 0/125 [00:00<?, ?it/s]                                              Traceback (most recent call last):
+  File "train.py", line 197, in <module>
+    main(config, save_path)
+  File "train.py", line 125, in main
+    train_loss = train(train_loader, model_G, optimizer_G)
+  File "train.py", line 83, in train
+    pre_src_tgt, pre_tgt_src = model_G(src_hr, tgt_hr, seq_src, seq_tgt)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/code/3DMedDM_v2/models/lccd.py", line 18, in forward
+    tgt_out = self.unet(tgt_t, t_1, prompt_tgt)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/code/3DMedDM_v2/models/diffusion.py", line 563, in forward
+    h = module(h, emb)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/code/3DMedDM_v2/models/diffusion.py", line 96, in forward
+    x = layer(x, emb)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/code/3DMedDM_v2/models/diffusion.py", line 217, in forward
+    h = self.in_layers(x)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/container.py", line 215, in forward
+    input = module(input)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/code/3DMedDM_v2/models/diffusion.py", line 77, in forward
+    return super().forward(x.float()).type(x.dtype)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/normalization.py", line 279, in forward
+    return F.group_norm(
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/functional.py", line 2558, in group_norm
+    return torch.group_norm(input, num_groups, weight, bias, eps, torch.backends.cudnn.enabled)
+RuntimeError: Expected weight to be a vector of size equal to the number of channels in input, but got weight of shape [256] and input of shape [2, 192, 4, 4, 4]

@@ -1,0 +1,5 @@
+config loaded.
+train dataset: size=250
+val dataset: size=250
+model_G: #params=7.7M
+damn torch.Size([2, 128, 4, 4, 4]) torch.Size([2, 128, 4, 4, 4])

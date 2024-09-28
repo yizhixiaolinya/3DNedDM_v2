@@ -1,0 +1,4 @@
+"sub-049":"Age: None; Gender: None; Scanner: 3.0 GE; Modality: T1w; Voxel size: (1.0, 1.0, 1.0); Imaging parameter TR(ms), TE(ms), TI(ms), and FA(degree): (5.7, 1.8, 450.0, 15.0)"
+"sub-052":"Age: None; Gender: None; Scanner: 3.0 GE; Modality: T1w; Voxel size: (1.0, 1.0, 1.0); Imaging parameter TR(ms), TE(ms), TI(ms), and FA(degree): (5.6, 1.8, 450.0, 15.0)"
+"sub-053":"Age: None; Gender: None; Scanner: 3.0 GE; Modality: T1w; Voxel size: (1.0, 1.0, 1.0); Imaging parameter TR(ms), TE(ms), TI(ms), and FA(degree): (5.6, 1.8, 450.0, 15.0)"
+"sub-054":"Age: None; Gender: None; Scanner: 3.0 GE; Modality: T1w; Voxel size: (1.0, 1.0, 1.0); Imaging parameter TR(ms), TE(ms), TI(ms), and FA(degree): (5.6, 1.8, 450.0, 15.0)"

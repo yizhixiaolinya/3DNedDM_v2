@@ -1,0 +1,4 @@
+/home_data/home/linxin2024/code/3DMedDM_v2/data_try/train/FLAIR_np/sub-049_FLAIR.nii.gz.npy
+/home_data/home/linxin2024/code/3DMedDM_v2/data_try/train/FLAIR_np/sub-052_FLAIR.nii.gz.npy
+/home_data/home/linxin2024/code/3DMedDM_v2/data_try/train/FLAIR_np/sub-053_FLAIR.nii.gz.npy
+/home_data/home/linxin2024/code/3DMedDM_v2/data_try/train/FLAIR_np/sub-054_FLAIR.nii.gz.npy

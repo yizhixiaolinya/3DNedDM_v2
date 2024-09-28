@@ -1,0 +1,3 @@
+train dataset: size=250
+val dataset: size=250
+model_G: #params=7.7M

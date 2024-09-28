@@ -1,0 +1,60 @@
+train_dataset:
+  dataset:
+    name: paired-image-folders
+    args:
+      root_path_0: /media/liu311/Elements/vision_language/data/
+      repeat: 2
+      cache: in_memory
+  wrapper:
+    name: sr-implicit-paired
+    args:
+      # inp_size: 60
+      scale_min: 1
+      scale_max: 4
+      augment: true
+      sample_q: 8000
+      
+  batch_size: 32
+
+val_dataset:
+  dataset:
+    name: paired-image-folders
+    args:
+      root_path_0:  /media/liu311/Elements/vision_language/data/
+      first_k: 180
+      repeat: 1
+      cache: in_memory
+  wrapper:
+    name: sr-implicit-paired
+    args:
+      inp_size: 
+      scale_min: 1
+      scale_max: 4
+      augment: true
+      sample_q: 8000
+      
+  batch_size: 1
+
+
+model:
+  name: lccd
+  args:
+    encoder_spec:
+      name: resencoder-64
+      args:
+        no_upsampling: true
+        scale: 1
+    no_imnet: False
+      
+
+optimizer:
+  name: adam
+  args:
+    lr: 1.e-4
+epoch_max: 1000
+multi_step_lr:
+  milestones: [200, 400, 600, 800, 1000]
+  gamma: 0.5
+
+epoch_val: 1
+epoch_save: 200
