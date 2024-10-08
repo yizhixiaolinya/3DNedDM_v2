@@ -1,3 +1,10 @@
 train dataset: size=250
 val dataset: size=250
 model_G: #params=7.7M
+epoch 1/500, lr_G=0.000010, loss0=0.2777, loss1=0.2526, 1.0m 1.0m/8.4h
+epoch 2/500, lr_G=0.000010, loss0=0.2483, loss1=0.2222, 1.0m 2.0m/8.4h
+epoch 3/500, lr_G=0.000010, loss0=0.2221, loss1=0.2046, 59.0s 3.0m/8.3h
+epoch 4/500, lr_G=0.000010, loss0=0.2200, loss1=0.2036, 56.5s 3.9m/8.2h
+epoch 5/500, lr_G=0.000010, loss0=0.2106, loss1=0.1976, 54.8s 4.9m/8.1h
+epoch 6/500, lr_G=0.000010, loss0=0.2176, loss1=0.2020, 53.9s 5.8m/8.0h
+epoch 7/500, lr_G=0.000010, loss0=0.2044, loss1=0.1925, 54.1s 6.7m/7.9h

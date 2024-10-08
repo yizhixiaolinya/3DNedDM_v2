@@ -1,13 +1,13 @@
-RN50: 
-  embed_dim : 768
-  image_resolution : 120
-  vision_layers : [3, 4, 6, 3]
-  vision_width : 256  # 256 in CLIP
+RN50:  # 视觉编码器
+  embed_dim : 768 # 嵌入维度
+  image_resolution : 120 # 图像分辨率
+  vision_layers : [3, 4, 6, 3] # 视觉层
+  vision_width : 256  # 256 in CLIP , transformer_width
   vision_patch_size : 0 # ideally it should be none
   context_length : 90
   vocab_size : 49408
   transformer_width : 512 #512 in CLIP
-  transformer_heads : 8
+  transformer_heads : 8 # 多头注意力头数
   transformer_layers : 8  # 12 in CLIP
 
 

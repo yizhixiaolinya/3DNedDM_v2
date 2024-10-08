@@ -7,13 +7,12 @@ from utils_clip.simple_tokenizer import SimpleTokenizer
 import numpy as np
 import os
 from itertools import product
-# from ssim import SSIM
+from ssim import SSIM
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from CLIP.model import CLIP
 from utils_clip import load_config_file
 import time
 from concurrent.futures import ThreadPoolExecutor
-
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 checkpoint_path = '/public/home/v-wangyl/wo_text_vit/BMLIP/checkpoint_99_13900.pt'
 MODEL_CONFIG_PATH = 'CLIP/model_config.yaml'
@@ -132,14 +131,12 @@ def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size,
     for start_pos in pos:
         img_0_lr_patch = img_vol_0[start_pos[0]:start_pos[0] + crop_size[0], start_pos[1]:start_pos[1] + crop_size[1], start_pos[2]:start_pos[2] + crop_size[2]]
         img_1_lr_patch = img_vol_1[start_pos[0]:start_pos[0] + crop_size[0], start_pos[1]:start_pos[1] + crop_size[1], start_pos[2]:start_pos[2] + crop_size[2]]
-        # img_0_lr_patch = torch.tensor(img_0_lr_patch).cuda().float().unsqueeze(0).unsqueeze(0)
-        # img_1_lr_patch = torch.tensor(img_1_lr_patch).cuda().float().unsqueeze(0).unsqueeze(0)
-        img_0_lr_patch = torch.tensor(img_0_lr_patch).cuda().float().unsqueeze(0)
-        img_1_lr_patch = torch.tensor(img_1_lr_patch).cuda().float().unsqueeze(0)
-        print(img_0_lr_patch.shape)
+        img_0_lr_patch = torch.tensor(img_0_lr_patch).cuda().float().unsqueeze(0).unsqueeze(0)
+        img_1_lr_patch = torch.tensor(img_1_lr_patch).cuda().float().unsqueeze(0).unsqueeze(0)
+        
+        model.eval()
         with torch.no_grad():
-            # pred_0_1_patch = model(img_0_lr_patch, img_1_lr_patch, coord_hr, seq_src.cuda().float(), seq_tgt.cuda().float())
-             pred_0_1_patch = model(img_0_lr_patch, img_1_lr_patch, seq_src.cuda().float(), seq_tgt.cuda().float())
+            pred_0_1_patch = model(img_0_lr_patch, img_1_lr_patch, coord_hr, seq_src.cuda().float(), seq_tgt.cuda().float())
         pred_0_1_patch = pred_0_1_patch.squeeze(0).squeeze(-1).cpu().numpy().reshape(W_pt, H_pt, D_pt)
         
         target_pos0 = int(start_pos[0] * scale0)
@@ -164,7 +161,7 @@ psnr_0_1_list = []
 psnr_1_0_list = []
 ssim_0_1_list = []
 ssim_1_0_list = []
-model_pth = '/home_data/home/linxin2024/code/3DMedDM_v2/save/_train_lccd_sr/epoch-best.pth'
+model_pth = '/public/home/v-wangyl/wo_text_vit/BMLIP/save_0/_train_lccd_sr/epoch-350.pth'
 model_img = models.make(torch.load(model_pth)['model_G'], load_sd=True).cuda()
 img_path_0 = r'/public_bme/data/ylwang/15T_3T/img'
 img_path_1 = r'/public_bme/data/ylwang/15T_3T/img'
@@ -209,7 +206,7 @@ for idx, (i, j) in enumerate(zip(img_list_0, img_list_1)):
 
     new_spacing_1 = set_new_spacing(img_1_spacing, coord_size, crop_size)
     
-    utils.write_img(pred_0_1, os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo', '15T_3T_'+i), os.path.join(img_path_1, j),new_spacing=new_spacing_1)
+    utils.write_img(pred_0_1, os.path.join('/public/home/v-wangyl/wo_text_vit/BMLIP/results/15T_3T/HCPA', '15T_3T_'+i), os.path.join(img_path_1, j),new_spacing=new_spacing_1)
     #utils.write_img(pred_1_0, os.path.join('/public/home/v-wangyl/wo_text_vit/BMLIP/results/AIBL/', 'PD_T1_'+i), os.path.join(img_path_0, i),new_spacing=new_spacing_0)
     """
     psnr_0_1_list.append(psnr(pred_0_1, img_vol_1))

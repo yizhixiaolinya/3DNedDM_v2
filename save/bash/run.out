@@ -1,5 +1,49 @@
-config loaded.
-train dataset: size=250
-val dataset: size=250
-model_G: #params=7.7M
-damn torch.Size([2, 128, 4, 4, 4]) torch.Size([2, 128, 4, 4, 4])
+2024-10-08 13:55:40.855029: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2024-10-08 13:55:40.858881: I tensorflow/tsl/cuda/cudart_stub.cc:28] Could not find cuda drivers on your machine, GPU will not be used.
+2024-10-08 13:55:40.920687: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2024-10-08 13:55:41.742038: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3526.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+lx_demo.py:157: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  coord_hr = torch.tensor(coord_hr).cuda().float().unsqueeze(0)
+img_vol_src shape: (24, 512, 512)
+img_vol_tgt shape: (24, 512, 512)
+seq_src shape: torch.Size([1, 768])
+seq_tgt shape: torch.Size([1, 768])
+done1
+img_vol_src shape: (24, 512, 512)
+img_vol_tgt shape: (24, 512, 512)
+done2
+Traceback (most recent call last):
+  File "lx_demo.py", line 178, in <module>
+    pred_0_1 = get_predictions(model_img, img_vol_0, img_vol_1, seq_src, seq_tgt)
+  File "lx_demo.py", line 97, in get_predictions
+    pred_src_tgt = model(img_vol_src, img_vol_tgt, seq_src.cuda().float(), seq_tgt.cuda().float())
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/code/3DMedDM_v2/models/lccd.py", line 18, in forward
+    tgt_out = self.unet(tgt_t, t_1, prompt_tgt)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/code/3DMedDM_v2/models/diffusion.py", line 551, in forward
+    h = module(h, emb)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/code/3DMedDM_v2/models/diffusion.py", line 98, in forward
+    x = layer(x)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 610, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home_data/home/linxin2024/anaconda3/envs/synthesis/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 605, in _conv_forward
+    return F.conv3d(
+RuntimeError: Expected 4D (unbatched) or 5D (batched) input to conv3d, but got input of size: [1, 1, 1, 24, 512, 512]

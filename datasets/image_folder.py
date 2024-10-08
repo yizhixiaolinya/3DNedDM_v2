@@ -81,7 +81,6 @@ class ImageFolder(Dataset):
             seq_tgt = model.encode_text(seq_tgt)
 
         img_vol_src_hr = nib.load(patch_src_hr.strip()).get_fdata()
-        # img_vol_src_hr = np.load(patch_src_hr.strip(), allow_pickle=True)  
         img_vol_tgt_hr = nib.load(patch_tgt_hr.strip()).get_fdata()
 
         return img_vol_src_hr, img_vol_tgt_hr, seq_src, seq_tgt  # last_hidden_state

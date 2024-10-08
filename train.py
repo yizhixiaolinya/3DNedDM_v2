@@ -81,7 +81,7 @@ def train(train_loader, model_G, optimizer_G):
         src_hr = batch['src_hr'].cuda()
 
         pre_src_tgt, pre_tgt_src = model_G(src_hr, tgt_hr, seq_src, seq_tgt)
-        print(pre_src_tgt.shape,pre_tgt_src.shape)
+
         loss_src = loss_fn(pre_src_tgt, tgt_hr)
         loss_tgt = loss_fn(pre_tgt_src, src_hr)
 
@@ -175,7 +175,7 @@ def main(config_, save_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='./configs/train_lccd_sr.yaml')
+    parser.add_argument('--config', default='/home_data/home/linxin2024/code/3DMedDM_v2/configs/train_lccd_sr.yaml')       
     parser.add_argument('--name', default=None)
     parser.add_argument('--tag', default=None)
     parser.add_argument('--gpu', default='0')
