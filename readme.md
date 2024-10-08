@@ -3,3 +3,8 @@ step 2: 修改/home_data/home/linxin2024/code/3DMedDM_v2/configs/train_lccd_sr.y
 step 3: train.py
 step 4: 对/home_data/home/linxin2024/code/3DMedDM_v2/save/_train_lccd_sr/log.txt进行绘制
 step 5: demo.py 用于test,sbatch /home_data/home/linxin2024/code/3DMedDM_v2/lx_synthesis.bash对任务进行提交
+
+
+
+乱玩~
+test_dimension_for_demo.py 用于测试Itk和nibabel读取的图像维度是否一致

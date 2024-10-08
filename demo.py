@@ -7,14 +7,17 @@ from utils_clip.simple_tokenizer import SimpleTokenizer
 import numpy as np
 import os
 from itertools import product
-from ssim import SSIM
+
+# from pytorch_msssim import ssim, ms_ssim
+# from ssim import SSIM
+
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from CLIP.model import CLIP
 from utils_clip import load_config_file
 import time
 from concurrent.futures import ThreadPoolExecutor
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-checkpoint_path = '/public/home/v-wangyl/wo_text_vit/BMLIP/checkpoint_99_13900.pt'
+checkpoint_path = '/public_bme/home/linxin/13119176/checkpoint_CLIP.pt'
 MODEL_CONFIG_PATH = 'CLIP/model_config.yaml'
 model_config = load_config_file(MODEL_CONFIG_PATH)
 
@@ -114,39 +117,74 @@ def calculate_patch_index(target_size, patch_size, overlap_ratio=0.25):
 
 
 def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size, coord_hr, seq_src, seq_tgt):
-    W, H, D = img_vol_0.shape
+    '''
+    [batch_size, channels, depth, height, width]
+    train中的维度
+    seq_src shape: torch.Size([2, 1, 768])
+    seq_tgt shape: torch.Size([2, 1, 768])
+    tgt_hr shape: torch.Size([2, 32, 32, 32])
+    src_hr shape: torch.Size([2, 32, 32, 32])
+    
+    '''
+    # print('seq_src.shape:', seq_src.shape) # torch.Size([1, 768])
+    # 调整 seq_src 和 seq_tgt 的维度，使其与训练时保持一致
+    seq_src = seq_src.unsqueeze(0).repeat(2, 1, 1) # [2, 1, 768]
+    seq_tgt = seq_tgt.unsqueeze(0).repeat(2, 1, 1) # [2, 1, 768]
+    # print('seq_src.shape:', seq_src.shape)
+
+    W, H, D = img_vol_0.shape # 获取长宽高
+    # crop_size 表示每次裁剪的3D图像块的大小
     W_po, H_po, D_po = crop_size[0], crop_size[1], crop_size[2]
+    # coord_size 是在高分辨率图像下的目标块尺寸，通常用于将低分辨率图像与高分辨率坐标进行对齐
     W_pt, H_pt, D_pt = coord_size[0], coord_size[1], coord_size[2]
+    # 计算缩放比例
     scale0 = W_pt/W_po
     scale1 = H_pt/H_po
     scale2 = D_pt/D_po
+    # 计算高分辨率的图像尺寸
     W_t = int(W * scale0)
     H_t = int(H * scale1)
     D_t = int(D * scale2)
     pos = calculate_patch_index((W, H, D), crop_size, overlap_ratio)
+    # 生成预测矩阵
     pred_0_1 = np.zeros((W_t, H_t, D_t))
     pred_1_0 = np.zeros((W_t, H_t, D_t))
-    freq_rec = np.zeros((W_t, H_t, D_t))
+    freq_rec = np.zeros((W_t, H_t, D_t)) # 用于记录每个位置预测的次数，方便在最终进行平均
     start_time = time.time()
+
     for start_pos in pos:
+        # 通过分割图像为小块（patch），然后对每个小块进行预测，最后将所有小块的预测结果组合回完整的高分辨率图像中
+        # 提取低分辨率图像块
         img_0_lr_patch = img_vol_0[start_pos[0]:start_pos[0] + crop_size[0], start_pos[1]:start_pos[1] + crop_size[1], start_pos[2]:start_pos[2] + crop_size[2]]
         img_1_lr_patch = img_vol_1[start_pos[0]:start_pos[0] + crop_size[0], start_pos[1]:start_pos[1] + crop_size[1], start_pos[2]:start_pos[2] + crop_size[2]]
-        img_0_lr_patch = torch.tensor(img_0_lr_patch).cuda().float().unsqueeze(0).unsqueeze(0)
-        img_1_lr_patch = torch.tensor(img_1_lr_patch).cuda().float().unsqueeze(0).unsqueeze(0)
-        
+        img_0_lr_patch = torch.tensor(img_0_lr_patch).cuda().float().unsqueeze(0).repeat(2, 1, 1, 1) # unsqueeze(0) 两次的作用是扩展图像块的维度，使其从 [depth, height, width] 转换为 [batch_size, channels, depth, height, width] 的形状
+        img_1_lr_patch = torch.tensor(img_1_lr_patch).cuda().float().unsqueeze(0).repeat(2, 1, 1, 1) 
+        print('img_0_lr_patch.shape:', img_0_lr_patch.shape) # [2, 20, 60, 60]
+        print('img_1_lr_patch.shape:', img_1_lr_patch.shape) 
+
+
         model.eval()
         with torch.no_grad():
-            pred_0_1_patch = model(img_0_lr_patch, img_1_lr_patch, coord_hr, seq_src.cuda().float(), seq_tgt.cuda().float())
-        pred_0_1_patch = pred_0_1_patch.squeeze(0).squeeze(-1).cpu().numpy().reshape(W_pt, H_pt, D_pt)
+            # 将两个图像块 img_0_lr_patch 和 img_1_lr_patch 以及相应的文本嵌入 seq_src 和 seq_tgt 传入模型进行预测，生成预测结果 pred_0_1_patch
+            pred_0_1_patch = model(img_0_lr_patch, img_1_lr_patch, seq_src.cuda().float(), seq_tgt.cuda().float())
+        print('pred_0_1_patch.shape:',pred_0_1_patch.shape)
+        # 通过 squeeze(0) 去掉批次维度，squeeze(-1) 去掉最后一维（可能是模型输出的通道维度）
+        # 使用 reshape(W_pt, H_pt, D_pt) 将预测结果重新塑形为高分辨率图像块的尺寸
+        pred_0_1_patch = pred_0_1_patch.squeeze(0).cpu().numpy().reshape(W_pt, H_pt, D_pt)
         
+        # 将预测结果拼接回完整图像
         target_pos0 = int(start_pos[0] * scale0)
         target_pos1 = int(start_pos[1] * scale1)
         target_pos2 = int(start_pos[2] * scale2)
         pred_0_1[target_pos0:target_pos0 + W_pt, target_pos1:target_pos1 + H_pt, target_pos2:target_pos2 + D_pt] += pred_0_1_patch[:, :, :]
        
+        # 记录每个位置的预测次数
         freq_rec[target_pos0:target_pos0 + W_pt, target_pos1:target_pos1 + H_pt, target_pos2:target_pos2 + D_pt] += 1
+    
     end_time = time.time()
     print(end_time-start_time)
+
+    # 计算预测的最终输出
     pred_0_1_img = pred_0_1 / freq_rec
 
     return pred_0_1_img
@@ -161,52 +199,72 @@ psnr_0_1_list = []
 psnr_1_0_list = []
 ssim_0_1_list = []
 ssim_1_0_list = []
-model_pth = '/public/home/v-wangyl/wo_text_vit/BMLIP/save_0/_train_lccd_sr/epoch-350.pth'
+model_pth = '/home_data/home/linxin2024/code/3DMedDM_v2/save/_train_lccd_sr/epoch-last.pth'
 model_img = models.make(torch.load(model_pth)['model_G'], load_sd=True).cuda()
+
 img_path_0 = r'/public_bme/data/ylwang/15T_3T/img'
 img_path_1 = r'/public_bme/data/ylwang/15T_3T/img'
 img_list_0 = sorted(os.listdir(img_path_0))
 img_list_1 = sorted(os.listdir(img_path_1))
+
 prompt_M1 = r'/public_bme/data/ylwang/15T_3T/text_prompt_HCPA.txt'
 prompt_M2 = r'/public_bme/data/ylwang/15T_3T/text_prompt_HCPA.txt'
 with open(prompt_M1) as f1, open(prompt_M2) as f2:
     lines_M1 = f1.readlines()
     lines_M2 = f2.readlines()
 
+# 循环读取每对图像，进行推理
 for idx, (i, j) in enumerate(zip(img_list_0, img_list_1)):
     start_time_0 = time.time()
     img_0 = sitk.ReadImage(os.path.join(img_path_0, i))
     img_0_spacing = img_0.GetSpacing()
     img_vol_0 = sitk.GetArrayFromImage(img_0)
+
     H, W, D = img_vol_0.shape
     img_vol_0 = img_pad(img_vol_0, target_shape=(H, W, D))
+
     img_1 = sitk.ReadImage(os.path.join(img_path_1, j))
     img_1_spacing = img_1.GetSpacing()
     img_vol_1 = sitk.GetArrayFromImage(img_1)
+
     img_vol_1 = img_pad(img_vol_1, target_shape=(H, W, D))
+
+    # 对图像进行归一化或去异常值处理
     img_vol_0 = utils.percentile_clip(img_vol_0)
     img_vol_1 = utils.percentile_clip(img_vol_1)
+    # 输出经过处理后图像的维度 (24, 512, 512)
+    print(f"Image {i} processed dimensions: {img_vol_0.shape}")
+    print(f"Image {j} processed dimensions: {img_vol_1.shape}")
+
     coord_size = [60, 60, 60]
     coord_hr = utils.make_coord(coord_size, flatten=True)
-    coord_hr = torch.tensor(coord_hr).cuda().float().unsqueeze(0)
+    coord_hr = coord_hr.clone().detach().cuda().float().unsqueeze(0)
+
     text_src = lines_M1[idx].replace('"', '')
     text_src = text_src.strip((text_src.strip().split(':'))[0])
     text_src = text_src.strip(text_src[0])
+
     text_tgt = lines_M2[idx].replace('"', '')
     text_tgt = text_tgt.strip((text_tgt.strip().split(':'))[0])
     text_tgt = text_tgt.strip(text_tgt[0])
+
     seq_src = tokenize(text_src, tokenizer).cuda()
     with torch.no_grad():
         seq_src = model.encode_text(seq_src)
     seq_tgt = tokenize(text_tgt, tokenizer).cuda()
     with torch.no_grad():
         seq_tgt = model.encode_text(seq_tgt)
-    crop_size = (20, 60, 60)
+
+    # 输出文本嵌入的维度 [1, 768]
+    # print(f"Text source embedding dimensions: {seq_src.shape}")
+    # print(f"Text target embedding dimensions: {seq_tgt.shape}")
+    
+    # 通过模型进行预测
+    crop_size = (20, 60, 60) # crop_size 表示每次裁剪的3D图像块的大小，这里将其拆分为宽度、高度和深度
     pred_0_1 = _get_pred(crop_size, 0.5, model_img, img_vol_0, img_vol_1, coord_size, coord_hr, seq_src, seq_tgt)
 
     new_spacing_1 = set_new_spacing(img_1_spacing, coord_size, crop_size)
-    
-    utils.write_img(pred_0_1, os.path.join('/public/home/v-wangyl/wo_text_vit/BMLIP/results/15T_3T/HCPA', '15T_3T_'+i), os.path.join(img_path_1, j),new_spacing=new_spacing_1)
+    utils.write_img(pred_0_1, os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo', '15T_3T_'+i), os.path.join(img_path_1, j),new_spacing=new_spacing_1)
     #utils.write_img(pred_1_0, os.path.join('/public/home/v-wangyl/wo_text_vit/BMLIP/results/AIBL/', 'PD_T1_'+i), os.path.join(img_path_0, i),new_spacing=new_spacing_0)
     """
     psnr_0_1_list.append(psnr(pred_0_1, img_vol_1))

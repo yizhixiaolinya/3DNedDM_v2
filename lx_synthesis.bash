@@ -17,9 +17,7 @@ source /home_data/home/linxin2024/anaconda3/bin/activate synthesis
 
 
 # 进入工作目录
-cd /home_data/home/linxin2024/code/3DMedDM_v2/
-
-# 检查Python环境
+cd /home_data/home/linxin2024/code/3DMedDM_v2
 
 # 执行任务
-python lx_demo.py
+python /home_data/home/linxin2024/code/3DMedDM_v2/demo.py
