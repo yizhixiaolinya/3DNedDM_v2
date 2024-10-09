@@ -7,10 +7,6 @@ from utils_clip.simple_tokenizer import SimpleTokenizer
 import numpy as np
 import os
 from itertools import product
-
-# from pytorch_msssim import ssim, ms_ssim
-# from ssim import SSIM
-
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from CLIP.model import CLIP
 from utils_clip import load_config_file
@@ -90,7 +86,6 @@ def img_pad(img, target_shape):
     cropped_img = padded_img[tuple(crops)]
     return cropped_img
 
-
 def calculate_patch_index(target_size, patch_size, overlap_ratio=0.25):
     shape = target_size
 
@@ -114,7 +109,6 @@ def calculate_patch_index(target_size, patch_size, overlap_ratio=0.25):
     for i in product(*loop_val):
         start_pos.append(i)
     return start_pos
-
 
 def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size, coord_hr, seq_src, seq_tgt):
     '''
@@ -159,18 +153,42 @@ def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size,
         img_1_lr_patch = img_vol_1[start_pos[0]:start_pos[0] + crop_size[0], start_pos[1]:start_pos[1] + crop_size[1], start_pos[2]:start_pos[2] + crop_size[2]]
         img_0_lr_patch = torch.tensor(img_0_lr_patch).cuda().float().unsqueeze(0).repeat(2, 1, 1, 1) # unsqueeze(0) 两次的作用是扩展图像块的维度，使其从 [depth, height, width] 转换为 [batch_size, channels, depth, height, width] 的形状
         img_1_lr_patch = torch.tensor(img_1_lr_patch).cuda().float().unsqueeze(0).repeat(2, 1, 1, 1) 
-        print('img_0_lr_patch.shape:', img_0_lr_patch.shape) # [2, 20, 60, 60]
+        print('img_0_lr_patch.shape:', img_0_lr_patch.shape) # [2, 20, 60, 60] ->(crop_size修改后) [2, 8, 32, 32]
         print('img_1_lr_patch.shape:', img_1_lr_patch.shape) 
-
 
         model.eval()
         with torch.no_grad():
             # 将两个图像块 img_0_lr_patch 和 img_1_lr_patch 以及相应的文本嵌入 seq_src 和 seq_tgt 传入模型进行预测，生成预测结果 pred_0_1_patch
             pred_0_1_patch = model(img_0_lr_patch, img_1_lr_patch, seq_src.cuda().float(), seq_tgt.cuda().float())
-        print('pred_0_1_patch.shape:',pred_0_1_patch.shape)
-        # 通过 squeeze(0) 去掉批次维度，squeeze(-1) 去掉最后一维（可能是模型输出的通道维度）
+            
+            # 查看tuple的结构和每个元素的内容
+            for idx, item in enumerate(pred_0_1_patch):
+                print(f"Element {idx}: Type: {type(item)}, Shape: {item.shape if isinstance(item, torch.Tensor) else 'N/A'}")
+                # 见lccd.py 中的 tgt_out 和 src_out, Shape: torch.Size([2, 1, 8, 32, 32])
+
+            # 获取主输出
+            pred_0_1_patch = pred_0_1_patch[0]
+
         # 使用 reshape(W_pt, H_pt, D_pt) 将预测结果重新塑形为高分辨率图像块的尺寸
-        pred_0_1_patch = pred_0_1_patch.squeeze(0).cpu().numpy().reshape(W_pt, H_pt, D_pt)
+        # pred_0_1_patch = pred_0_1_patch.squeeze(0).cpu().numpy().reshape(W_pt, H_pt, D_pt)
+        # print('pred_0_1_patch:', pred_0_1_patch)
+
+        # 通过 squeeze(0) 去掉批次维度
+        print(f"Original pred_0_1_patch shape before squeezing: {pred_0_1_patch.shape}")
+        pred_0_1_patch = pred_0_1_patch.squeeze(0).cpu().numpy()
+
+        # 打印实际的 shape   (2, 1, 8, 32, 32)
+        print(f"pred_0_1_patch shape after squeezing: {pred_0_1_patch.shape}")
+
+        # 尝试将 pred_0_1_patch 重塑为期望的大小 W_pt, H_pt, D_pt
+        try:
+            pred_0_1_patch = pred_0_1_patch.reshape(W_pt, H_pt, D_pt)
+        except ValueError as e:
+            print(f"Error in reshaping: {e}")
+            # 打印 pred_0_1_patch 的尺寸和 W_pt, H_pt, D_pt  16384
+            print(f"Cannot reshape array of size {pred_0_1_patch.size} into shape ({W_pt}, {H_pt}, {D_pt})")
+
+
         
         # 将预测结果拼接回完整图像
         target_pos0 = int(start_pos[0] * scale0)
@@ -186,7 +204,7 @@ def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size,
 
     # 计算预测的最终输出
     pred_0_1_img = pred_0_1 / freq_rec
-
+    print('pred_0_1_img:',pred_0_1_img)
     return pred_0_1_img
 
 def psnr(ref,ret):
@@ -201,6 +219,7 @@ ssim_0_1_list = []
 ssim_1_0_list = []
 model_pth = '/home_data/home/linxin2024/code/3DMedDM_v2/save/_train_lccd_sr/epoch-last.pth'
 model_img = models.make(torch.load(model_pth)['model_G'], load_sd=True).cuda()
+# print(model_img) -> model_img.out
 
 img_path_0 = r'/public_bme/data/ylwang/15T_3T/img'
 img_path_1 = r'/public_bme/data/ylwang/15T_3T/img'
@@ -260,7 +279,7 @@ for idx, (i, j) in enumerate(zip(img_list_0, img_list_1)):
     # print(f"Text target embedding dimensions: {seq_tgt.shape}")
     
     # 通过模型进行预测
-    crop_size = (20, 60, 60) # crop_size 表示每次裁剪的3D图像块的大小，这里将其拆分为宽度、高度和深度
+    crop_size = (32, 32, 32) # crop_size 表示每次裁剪的3D图像块的大小，这里将其拆分为宽度、高度和深度
     pred_0_1 = _get_pred(crop_size, 0.5, model_img, img_vol_0, img_vol_1, coord_size, coord_hr, seq_src, seq_tgt)
 
     new_spacing_1 = set_new_spacing(img_1_spacing, coord_size, crop_size)

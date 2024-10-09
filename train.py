@@ -79,7 +79,10 @@ def train(train_loader, model_G, optimizer_G):
         seq_tgt = batch['seq_tgt'].cuda()
         tgt_hr = batch['tgt_hr'].cuda()
         src_hr = batch['src_hr'].cuda()
-
+        # print('frc_hr.shape', src_hr.shape)
+        # print('tgt_hr.shape', tgt_hr.shape)
+        # print('seq_src.shape', seq_src.shape)
+        # print('seq_tgt.shape', seq_tgt.shape)
         pre_src_tgt, pre_tgt_src = model_G(src_hr, tgt_hr, seq_src, seq_tgt)
 
         loss_src = loss_fn(pre_src_tgt, tgt_hr)

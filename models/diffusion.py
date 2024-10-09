@@ -547,14 +547,14 @@ class UNet(nn.Module):
         hs = []
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
 
-        print('forward')
-        print(f"x before input_blocks: {x.shape}")
+        # print('forward')
+        # print(f"x before input_blocks: {x.shape}")
 
         h = x.type(self.dtype)
         for module in self.input_blocks:
             h = module(h, emb)
             hs.append(h)
-            print(f"Shape after input block: {h.shape}")
+            # print(f"Shape after input block: {h.shape}")
 
         for module in self.middle_block:
             if isinstance(module, CrossAttention):
@@ -563,15 +563,15 @@ class UNet(nn.Module):
                 x = module(h)
             else:
                 x = module(h, emb)
-            print(f"Shape after middle block: {h.shape}")
+            # print(f"Shape after middle block: {h.shape}")
 
         for module in self.output_blocks:
             # 检查维度是否匹配
-            print(f"h shape: {h.shape}, hs.pop() shape: {hs[-1].shape}")
+            # print(f"h shape: {h.shape}, hs.pop() shape: {hs[-1].shape}")
             
             h = torch.cat([h, hs.pop()], dim=1)
             h = module(h, emb)
-            print(f"Shape after output block: {h.shape}")
+            # print(f"Shape after output block: {h.shape}")
         h = h.type(x.dtype)
         return self.out(h)
 
