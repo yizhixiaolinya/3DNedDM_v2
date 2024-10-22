@@ -6,11 +6,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-# 整合了 Modified ResNet 和 Visual Transformer 两种不同的视觉编码器，
-# 用于提取图像特征，并与文本特征进行匹配
 
 class Bottleneck(nn.Module):
-    # ResNet 中的基本残差块
     expansion = 4
 
     def __init__(self, inplanes, planes, stride=1):
@@ -57,7 +54,6 @@ class Bottleneck(nn.Module):
 
 
 class AttentionPool3d(nn.Module):
-    # 将多头注意力机制用于三维数据，提取重要特征
     def __init__(self, spacial_dim: int, embed_dim: int, num_heads: int, output_dim: int = None):
         super().__init__()
         self.positional_embedding = nn.Parameter(torch.randn(spacial_dim ** 3 + 1, embed_dim) / embed_dim ** 0.5)
@@ -95,13 +91,13 @@ class AttentionPool3d(nn.Module):
 
 
 class ModifiedResNet(nn.Module):
+    # 用于处理具有多层的视觉输入
     """
     A ResNet class that is similar to torchvision's but contains the following changes:
     - There are now 3 "stem" convolutions as opposed to 1, with an average pool instead of a max pool.
     - Performs anti-aliasing strided convolutions, where an avgpool is prepended to convolutions with stride > 1
     - The final pooling layer is a QKV attention instead of an average pool
     """
-    # 将图像分辨率逐步减少，并提取出多层次的特征表示，最终通过注意力机制进行全局特征的整合
 
     def __init__(self, layers, output_dim, heads, input_resolution=224, width=64):
         super().__init__()
@@ -162,7 +158,6 @@ class ModifiedResNet(nn.Module):
         #2,64
         return x
 
-
 class LayerNorm(nn.LayerNorm):
     """Subclass torch's LayerNorm to handle fp16."""
 
@@ -171,14 +166,11 @@ class LayerNorm(nn.LayerNorm):
         ret = super().forward(x.type(torch.float32))
         return ret.type(orig_type)
 
-
 class QuickGELU(nn.Module):
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
 
-
 class ResidualAttentionBlock(nn.Module):
-    # 结合多头注意力和多层感知机MLP来处理特征
     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None):
         super().__init__()
 
@@ -201,9 +193,8 @@ class ResidualAttentionBlock(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return x
 
-
 class Transformer(nn.Module):
-    # 由多个 ResidualAttentionBlock 组成，用来提取文本中的上下文关系
+    # 用于处理文本输入，由多个 ResidualAttentionBlock 组成
     def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None):
         super().__init__()
         self.width = width
@@ -213,9 +204,8 @@ class Transformer(nn.Module):
     def forward(self, x: torch.Tensor):
         return self.resblocks(x)
 
-
 class VisualTransformer(nn.Module):
-    # 使用了“patch embedding”来将图像分割成小块，然后通过 Transformer 来处理这些块，适合处理更高维的图像
+    # 用于处理基于补丁的视觉输入
     def __init__(self, input_resolution: int, patch_size: int, width: int, layers: int, heads: int, output_dim: int):
         super().__init__()
         self.input_resolution = input_resolution
@@ -251,10 +241,7 @@ class VisualTransformer(nn.Module):
 
         return x
 
-
 class CLIP(nn.Module):
-    # 使用 ResNet 或 Vision Transformer 来编码图像特征，
-    # 使用 Transformer 来编码文本特征，并通过线性投影将它们映射到相同的嵌入空间
     def __init__(self,
                  embed_dim: int,
                  # vision
@@ -273,6 +260,7 @@ class CLIP(nn.Module):
 
         self.context_length = context_length
 
+        # 根据 vision_layers 的类型使用 ModifiedResNet 或 VisualTransformer
         if isinstance(vision_layers, (tuple, list)):
             vision_heads = vision_width * 32 // 64
             self.visual = ModifiedResNet(
@@ -293,6 +281,7 @@ class CLIP(nn.Module):
                 output_dim=embed_dim
             )
 
+        # 初始化 transformer
         self.transformer = Transformer(
             width=transformer_width,
             layers=transformer_layers,

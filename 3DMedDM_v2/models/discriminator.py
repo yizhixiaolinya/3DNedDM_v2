@@ -23,7 +23,6 @@ class Discriminator(nn.Module):
 
         self.model = nn.Sequential(
             *discriminator_block(in_channels, 64, normalization=False),
-            # 逐层扩展通道数（64 -> 128 -> 256 -> 512）, 提取更丰富的特征信息
             *discriminator_block(64, 128),
             *discriminator_block(128, 256),
             *discriminator_block(256, 512),

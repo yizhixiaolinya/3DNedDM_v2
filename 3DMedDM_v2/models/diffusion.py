@@ -9,7 +9,6 @@ from models.linear import Linear
 
 
 class EMA:
-    # 用于计算模型参数的移动平均,帮助稳定训练过程
     def __init__(self, beta):
         super().__init__()
         self.beta = beta
@@ -38,13 +37,11 @@ class EMA:
 
 
 def timestep_embedding(gammas, dim, max_period=10000):
-    # 时间步
     half = dim // 2
     freqs = torch.exp(
         -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
     ).to(device=gammas.device)
     args = gammas[:, None].float() * freqs[None]
-    # 使用正弦和余弦函数将时间步 gammas 转换为高维度的向量
     embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
     if dim % 2:
         embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
@@ -99,7 +96,6 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
                 x = layer(x, emb)
             else:
                 x = layer(x)
-        # print(x)
         return x
 
 
@@ -550,15 +546,10 @@ class UNet(nn.Module):
         hs = []
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
 
-        # print('forward')
-        # print(f"x before input_blocks: {x.shape}")
-
         h = x.type(self.dtype)
         for module in self.input_blocks:
             h = module(h, emb)
             hs.append(h)
-            # print(f"Shape after input block: {h.shape}")
-
         for module in self.middle_block:
             if isinstance(module, CrossAttention):
                 h = module(h, y)
@@ -566,15 +557,9 @@ class UNet(nn.Module):
                 x = module(h)
             else:
                 x = module(h, emb)
-            # print(f"Shape after middle block: {h.shape}")
-
         for module in self.output_blocks:
-            # 检查维度是否匹配
-            # print(f"h shape: {h.shape}, hs.pop() shape: {hs[-1].shape}")
-            
             h = torch.cat([h, hs.pop()], dim=1)
             h = module(h, emb)
-            # print(f"Shape after output block: {h.shape}")
         h = h.type(x.dtype)
         return self.out(h)
 
@@ -588,17 +573,13 @@ def _extract_into_tensor(arr, timesteps, broadcast_shape):
 
 class Diffusion:
     def __init__(self, noise_steps=15, min_noise_level=0.04, etas_end=0.999, kappa=0.1):
-        # 初始化函数，设置噪声步骤、最小噪声水平、结束时的 eta 值和 kappa 值
-        # eta 控制扩散过程每一步中的噪声水平
         self.etas = self.get_named_eta_schedule(noise_steps, min_noise_level, etas_end)
         self.sqrt_etas = np.sqrt(self.etas)
-        # 控制生成过程中噪声的方差大小，影响生成图像的不确定性
         self.kappa = kappa
         self.noise_steps = noise_steps
         self.etas_prev = np.append(0.0, self.etas[:-1])
         self.alpha = self.etas - self.etas_prev
 
-        # 分别是计算后验方差、裁剪后的方差、后验均值系数等，用于推导生成图像时的后验分布
         self.posterior_variance = kappa ** 2 * self.etas_prev / self.etas * self.alpha
         self.posterior_variance_clipped = np.append(self.posterior_variance[1], self.posterior_variance[1:])
         self.posterior_log_variance_clipped = np.log(self.posterior_variance_clipped)
@@ -606,32 +587,27 @@ class Diffusion:
         self.posterior_mean_coef2 = self.alpha / self.etas
 
     def get_named_eta_schedule(self, noise_steps, min_noise_level, etas_end):
-        # 生成一个从 min_noise_level 到 etas_end 的等间隔数列，表示每个时间步的噪声水平
         power_timestep = np.linspace(min_noise_level, etas_end, noise_steps)
         return power_timestep
 
     def noise_images(self, x_start, y, t, noise=None):
-        # 对图像添加噪声
         noise = torch.randn_like(x_start)
         return (
-            _extract_into_tensor(self.etas, t, x_start.shape) * (y - x_start) + x_start
-            + _extract_into_tensor(self.sqrt_etas * self.kappa, t, x_start.shape) * noise
+                _extract_into_tensor(self.etas, t, x_start.shape) * (y - x_start) + x_start
+                + _extract_into_tensor(self.sqrt_etas * self.kappa, t, x_start.shape) * noise
         )
 
     def sample_timesteps(self, n):
-        # 随机采样时间步
         return torch.randint(low=0, high=self.noise_steps, size=(n,))
 
     def q_posterior_mean_variance(self, x_start, x_t, t):
-        # 计算后验均值和方差
         posterior_mean = (
-            _extract_into_tensor(self.posterior_mean_coef1, t, x_t.shape) * x_t
-            + _extract_into_tensor(self.posterior_mean_coef2, t, x_t.shape) * x_start
+                _extract_into_tensor(self.posterior_mean_coef1, t, x_t.shape) * x_t
+                + _extract_into_tensor(self.posterior_mean_coef2, t, x_t.shape) * x_start
         )
         return posterior_mean
 
     def p_mean_variance(self, model, x_t, y, t, cond, clip_denoised=True):
-        # 计算模型的均值和方差
         model_log_variance = _extract_into_tensor(self.posterior_log_variance_clipped, t, x_t.shape)
         pred = model(x_t, t, cond)
 
@@ -645,14 +621,12 @@ class Diffusion:
         return model_mean, model_log_variance
 
     def prior_sample(self, y, noise=None):
-        # 先验采样
         if noise is None:
             noise = torch.randn_like(y)
         t = torch.tensor([self.noise_steps - 1, ] * y.shape[0], device=y.device).long()
         return y + _extract_into_tensor(self.kappa * self.sqrt_etas, t, y.shape) * noise
 
     def p_sample(self, model, x, y, t, cond, clip_denoised=True):
-        # 采样
         mean, log_variance = self.p_mean_variance(model, x, y, t, cond, clip_denoised=clip_denoised)
         noise = torch.randn_like(x)
         nonzero_mask = ((t != 0).float().view(-1, *([1] * (len(x.shape) - 1))))
@@ -660,7 +634,6 @@ class Diffusion:
         return sample
 
     def sample(self, model, y, cond, clip_denoised=True):
-        # 首先通过 prior_sample 初始化图像，然后在每个时间步迭代地通过 p_sample 更新图像，最终输出生成的样本
         noise = torch.randn_like(y)
         y_sample = self.prior_sample(y, noise)
         indices = list(range(self.noise_steps))[::-1]

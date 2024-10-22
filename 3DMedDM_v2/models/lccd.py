@@ -1,11 +1,11 @@
 import torch.nn as nn
 from models.cross_att import Basic_block
-from models.linear import Linear # 用于判别
-from models.diffusion import UNet, Diffusion # U-Net和 Diffusion
+from models.linear import Linear
+from models.diffusion import UNet, Diffusion
 from models import register
 @register('lccd')
 class LCCD(nn.Module):
-    # 使用扩散模型（Diffusion）生成图像，并通过 U-Net 处理噪声图像以生成目标和源图像
+
     def __init__(self, encoder_spec, no_imnet):
         super().__init__()
         self.diffusion = Diffusion()
@@ -13,7 +13,7 @@ class LCCD(nn.Module):
     def forward(self, src_lr, tgt_lr, prompt_src, prompt_tgt):
 
         #tarin together
-        t_1 = self.diffusion.sample_timesteps(src_lr.shape[0]).cuda() # 控制噪声程度
+        t_1 = self.diffusion.sample_timesteps(src_lr.shape[0]).cuda()
         tgt_t = self.diffusion.noise_images(tgt_lr.unsqueeze(1), src_lr.unsqueeze(1), t_1)
         tgt_out = self.unet(tgt_t, t_1, prompt_tgt)
 
@@ -45,7 +45,6 @@ class LCCD(nn.Module):
 # Defines the PatchGAN discriminator with the specified arguments.
 @register('NLDiscri')
 class NLayerDiscriminator(nn.Module):
-    # 实现了一个基于 MLP（多层感知器） 的判别器，用于区分生成的图像与真实图像的特征
     def __init__(self, in_dim=0, out_dim=0, hidden_list=[]):
         super().__init__()
         self.layers = Linear(in_dim=in_dim, out_dim=out_dim, hidden_list=hidden_list)

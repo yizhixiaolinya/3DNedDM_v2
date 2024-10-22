@@ -118,6 +118,8 @@ def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size,
     seq_tgt shape: torch.Size([2, 1, 768])
     tgt_hr shape: torch.Size([2, 32, 32, 32])
     src_hr shape: torch.Size([2, 32, 32, 32])
+    pre_src_tgt.shape: torch.Size([2, 1, 32, 32, 32])
+    pre_tgt_src.shape: torch.Size([2, 1, 32, 32, 32])
     
     '''
     # print('seq_src.shape:', seq_src.shape) # torch.Size([1, 768])
@@ -173,29 +175,36 @@ def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size,
         # pred_0_1_patch = pred_0_1_patch.squeeze(0).cpu().numpy().reshape(W_pt, H_pt, D_pt)
         # print('pred_0_1_patch:', pred_0_1_patch)
 
-        # 通过 squeeze(0) 去掉批次维度
         print(f"Original pred_0_1_patch shape before squeezing: {pred_0_1_patch.shape}")
-        pred_0_1_patch = pred_0_1_patch.squeeze(0).cpu().numpy()
 
-        # 打印实际的 shape   (2, 1, 8, 32, 32)
-        print(f"pred_0_1_patch shape after squeezing: {pred_0_1_patch.shape}")
+        # 如果 batch_size 为 2，需要逐个处理每个 batch
+        # 去掉 channel 维度
+        pred_0_1_patch = pred_0_1_patch.squeeze(1).cpu().numpy()  # 去掉 channel 维度
 
-        # 尝试将 pred_0_1_patch 重塑为期望的大小 W_pt, H_pt, D_pt
-        try:
-            pred_0_1_patch = pred_0_1_patch.reshape(W_pt, H_pt, D_pt)
-        except ValueError as e:
-            print(f"Error in reshaping: {e}")
-            # 打印 pred_0_1_patch 的尺寸和 W_pt, H_pt, D_pt  16384
-            print(f"Cannot reshape array of size {pred_0_1_patch.size} into shape ({W_pt}, {H_pt}, {D_pt})")
+        # 处理 batch_size 维度
+        for batch_idx in range(pred_0_1_patch.shape[0]):
+            single_patch = pred_0_1_patch[batch_idx]  # 提取单个 batch
+            # print(f"Single patch shape: {single_patch.shape}")
 
+            # 检查是否需要 reshape，并进行处理
+            if single_patch.shape == (W_pt, H_pt, D_pt):
+                print("No reshape needed.")
+            else:
+                try:
+                    single_patch = single_patch.reshape(W_pt, H_pt, D_pt)
+                    print(f"Reshaped patch shape: {single_patch.shape}")
+                except ValueError as e:
+                    print(f"Error in reshaping: {e}")
+                    print(f"Cannot reshape array of size {single_patch.size} into shape ({W_pt}, {H_pt}, {D_pt})")
 
-        
-        # 将预测结果拼接回完整图像
+        # 将结果重新拼接回完整的图像中
         target_pos0 = int(start_pos[0] * scale0)
         target_pos1 = int(start_pos[1] * scale1)
         target_pos2 = int(start_pos[2] * scale2)
-        pred_0_1[target_pos0:target_pos0 + W_pt, target_pos1:target_pos1 + H_pt, target_pos2:target_pos2 + D_pt] += pred_0_1_patch[:, :, :]
-       
+
+        # 确保维度匹配
+        pred_0_1[target_pos0:target_pos0 + W_pt, target_pos1:target_pos1 + H_pt, target_pos2:target_pos2 + D_pt] += single_patch
+            
         # 记录每个位置的预测次数
         freq_rec[target_pos0:target_pos0 + W_pt, target_pos1:target_pos1 + H_pt, target_pos2:target_pos2 + D_pt] += 1
     
@@ -204,7 +213,8 @@ def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size,
 
     # 计算预测的最终输出
     pred_0_1_img = pred_0_1 / freq_rec
-    print('pred_0_1_img:',pred_0_1_img)
+    # print('pred_0_1_img:',pred_0_1_img)
+
     return pred_0_1_img
 
 def psnr(ref,ret):
@@ -212,37 +222,43 @@ def psnr(ref,ret):
     return -10*np.log10(np.mean(err**2))
 
 
-
 psnr_0_1_list = []
 psnr_1_0_list = []
 ssim_0_1_list = []
 ssim_1_0_list = []
-model_pth = '/home_data/home/linxin2024/code/3DMedDM_v2/save/_train_lccd_sr/epoch-last.pth'
+model_pth = '/home_data/home/linxin2024/code/3DMedDM_v2/save/train/batch_size_2/epoch-best.pth'
 model_img = models.make(torch.load(model_pth)['model_G'], load_sd=True).cuda()
 # print(model_img) -> model_img.out
 
-img_path_0 = r'/public_bme/data/ylwang/15T_3T/img'
-img_path_1 = r'/public_bme/data/ylwang/15T_3T/img'
-img_list_0 = sorted(os.listdir(img_path_0))
-img_list_1 = sorted(os.listdir(img_path_1))
+# 读取T1和SWI影像路径文件
+t1_img_file = r'/home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/demo/demo_T1_img.txt'
+swi_img_file = r'/home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/demo/demo_SWI_img.txt'
 
-prompt_M1 = r'/public_bme/data/ylwang/15T_3T/text_prompt_HCPA.txt'
-prompt_M2 = r'/public_bme/data/ylwang/15T_3T/text_prompt_HCPA.txt'
+# 读取影像路径列表
+with open(t1_img_file, 'r') as f_t1, open(swi_img_file, 'r') as f_swi:
+    t1_img_paths = [line.strip() for line in f_t1.readlines()]
+    swi_img_paths = [line.strip() for line in f_swi.readlines()]
+
+# 读取Prompt文件
+prompt_M1 = r'/home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/demo/demo_T1_prompt.txt'
+prompt_M2 = r'/home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/demo/demo_SWI_prompt.txt'
 with open(prompt_M1) as f1, open(prompt_M2) as f2:
     lines_M1 = f1.readlines()
     lines_M2 = f2.readlines()
 
 # 循环读取每对图像，进行推理
-for idx, (i, j) in enumerate(zip(img_list_0, img_list_1)):
+for idx, (img_0_file_path, img_1_file_path) in enumerate(zip(t1_img_paths, swi_img_paths)):
     start_time_0 = time.time()
-    img_0 = sitk.ReadImage(os.path.join(img_path_0, i))
+
+    # 使用 SimpleITK 读取图像
+    img_0 = sitk.ReadImage(img_0_file_path)
     img_0_spacing = img_0.GetSpacing()
     img_vol_0 = sitk.GetArrayFromImage(img_0)
 
     H, W, D = img_vol_0.shape
     img_vol_0 = img_pad(img_vol_0, target_shape=(H, W, D))
 
-    img_1 = sitk.ReadImage(os.path.join(img_path_1, j))
+    img_1 = sitk.ReadImage(img_1_file_path)
     img_1_spacing = img_1.GetSpacing()
     img_vol_1 = sitk.GetArrayFromImage(img_1)
 
@@ -251,22 +267,18 @@ for idx, (i, j) in enumerate(zip(img_list_0, img_list_1)):
     # 对图像进行归一化或去异常值处理
     img_vol_0 = utils.percentile_clip(img_vol_0)
     img_vol_1 = utils.percentile_clip(img_vol_1)
-    # 输出经过处理后图像的维度 (24, 512, 512)
-    print(f"Image {i} processed dimensions: {img_vol_0.shape}")
-    print(f"Image {j} processed dimensions: {img_vol_1.shape}")
+    print(f"Image {os.path.basename(img_0_file_path)} processed dimensions: {img_vol_0.shape}")
+    print(f"Image {os.path.basename(img_1_file_path)} processed dimensions: {img_vol_1.shape}")
 
-    coord_size = [60, 60, 60]
+    coord_size = [32, 32, 32]
     coord_hr = utils.make_coord(coord_size, flatten=True)
     coord_hr = coord_hr.clone().detach().cuda().float().unsqueeze(0)
 
-    text_src = lines_M1[idx].replace('"', '')
-    text_src = text_src.strip((text_src.strip().split(':'))[0])
-    text_src = text_src.strip(text_src[0])
+    # 提取对应的文本
+    text_src = lines_M1[idx].replace('"', '').strip((lines_M1[idx].strip().split(':'))[0]).strip()
+    text_tgt = lines_M2[idx].replace('"', '').strip((lines_M2[idx].strip().split(':'))[0]).strip()
 
-    text_tgt = lines_M2[idx].replace('"', '')
-    text_tgt = text_tgt.strip((text_tgt.strip().split(':'))[0])
-    text_tgt = text_tgt.strip(text_tgt[0])
-
+    # 进行文本token化
     seq_src = tokenize(text_src, tokenizer).cuda()
     with torch.no_grad():
         seq_src = model.encode_text(seq_src)
@@ -274,27 +286,33 @@ for idx, (i, j) in enumerate(zip(img_list_0, img_list_1)):
     with torch.no_grad():
         seq_tgt = model.encode_text(seq_tgt)
 
-    # 输出文本嵌入的维度 [1, 768]
-    # print(f"Text source embedding dimensions: {seq_src.shape}")
-    # print(f"Text target embedding dimensions: {seq_tgt.shape}")
-    
     # 通过模型进行预测
-    crop_size = (32, 32, 32) # crop_size 表示每次裁剪的3D图像块的大小，这里将其拆分为宽度、高度和深度
+    crop_size = (32, 32, 32)
     pred_0_1 = _get_pred(crop_size, 0.5, model_img, img_vol_0, img_vol_1, coord_size, coord_hr, seq_src, seq_tgt)
 
+    # 保存从T1到SWI的图像
     new_spacing_1 = set_new_spacing(img_1_spacing, coord_size, crop_size)
-    utils.write_img(pred_0_1, os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo', '15T_3T_'+i), os.path.join(img_path_1, j),new_spacing=new_spacing_1)
-    #utils.write_img(pred_1_0, os.path.join('/public/home/v-wangyl/wo_text_vit/BMLIP/results/AIBL/', 'PD_T1_'+i), os.path.join(img_path_0, i),new_spacing=new_spacing_0)
-    """
+    output_file_0_1 = os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo', f'T12SWI_{idx}.nii.gz')
+    utils.write_img(pred_0_1, output_file_0_1, img_1_file_path, new_spacing=new_spacing_1)
+
+    # 通过模型进行预测，从SWI到T1
+    pred_1_0 = _get_pred(crop_size, 0.5, model_img, img_vol_1, img_vol_0, coord_size, coord_hr, seq_tgt, seq_src)
+
+    # 保存从SWI到T1的图像
+    new_spacing_0 = set_new_spacing(img_0_spacing, coord_size, crop_size)
+    output_file_1_0 = os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo', f'SWI2T1_{idx}.nii.gz')
+    utils.write_img(pred_1_0, output_file_1_0, img_0_file_path, new_spacing=new_spacing_0)
+
+    # utils.write_img(pred_1_0, os.path.join('/public/home/v-wangyl/wo_text_vit/BMLIP/results/AIBL/', 'PD_T1_'+i), os.path.join(img_path_0, i),new_spacing=new_spacing_0)
+
     psnr_0_1_list.append(psnr(pred_0_1, img_vol_1))
     psnr_1_0_list.append(psnr(pred_1_0, img_vol_0))
     ssim_0_1_list.append(structural_similarity(pred_0_1, img_vol_1, data_range=1))
     ssim_1_0_list.append(structural_similarity(pred_1_0, img_vol_0, data_range=1))
 
-    print(np.mean(psnr_0_1_list), '±', np.std(psnr_0_1_list))
-    print(np.mean(psnr_1_0_list), '±', np.std(psnr_1_0_list))
-    print(np.mean(ssim_0_1_list), '±', np.std(ssim_0_1_list))
-    print(np.mean(ssim_1_0_list), '±', np.std(ssim_1_0_list))
-    
-    """
+    print('psnr0-1', np.mean(psnr_0_1_list), '±', np.std(psnr_0_1_list))
+    print('psnr1-0', np.mean(psnr_1_0_list), '±', np.std(psnr_1_0_list))
+    print('ssim0-1', np.mean(ssim_0_1_list), '±', np.std(ssim_0_1_list))
+    print('ssim1-0', np.mean(ssim_1_0_list), '±', np.std(ssim_1_0_list))
+
 

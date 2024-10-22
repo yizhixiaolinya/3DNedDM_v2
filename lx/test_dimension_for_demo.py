@@ -25,10 +25,10 @@ model.load_state_dict(state_dict)
 model.eval()
 
 # 读取图像文件路径
-image_path = r'/public_bme/data/ylwang/15T_3T/img/Philip_T1.nii.gz'
+image_path = r'/public_bme/data/ylwang/OASIS_clip/T1_brain/OAS31009_MR_d2325.nii.gz'
 
 # 读取文本路径
-prompt_M1 = r'/public_bme/data/ylwang/15T_3T/text_prompt_HCPA.txt'
+prompt_M1 = r'/home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/demo/demo_T1_prompt.txt'
 with open(prompt_M1, 'r') as f:
     lines = f.readlines()
 

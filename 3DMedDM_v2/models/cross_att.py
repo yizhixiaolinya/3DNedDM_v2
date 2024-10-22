@@ -5,56 +5,49 @@ from models.linear import Linear
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from einops import rearrange
 import numbers
-
 def to_3d(x):
-    # 将 3D 图像转换为二维矩阵表示，适用于特征提取过程
     return rearrange(x, 'b c d h w -> b (d h w) c')
 
 
 def to_4d(x, d, h, w):
-    # 将二维矩阵转换回 3D 图像格式，用于归一化后恢复原始维度
     return rearrange(x, 'b (d h w) c -> b c d h w', d=d, h=h, w=w)
 
 
 class BiasFree_LayerNorm(nn.Module):
     def __init__(self, normalized_shape):
-        # 初始化参数，定义归一化权重
         super(BiasFree_LayerNorm, self).__init__()
         if isinstance(normalized_shape, numbers.Integral):
             normalized_shape = (normalized_shape,)
         normalized_shape = torch.Size(normalized_shape)
 
-        # 只学习weight，没有bias
+        assert len(normalized_shape) == 1
+
         self.weight = nn.Parameter(torch.ones(normalized_shape))
         self.normalized_shape = normalized_shape
 
     def forward(self, x):
-        # sigma 是方差，表示数据的离散程度
         sigma = x.var(-1, keepdim=True, unbiased=False)
-
-        # 用方差来归一化数据，让数据的方差保持在一定范围内
         return x / torch.sqrt(sigma + 1e-5) * self.weight
 
+
 class WithBias_LayerNorm(nn.Module):
-    # 除了缩放 还可以调整数据的中心位置
     def __init__(self, normalized_shape):
         super(WithBias_LayerNorm, self).__init__()
         if isinstance(normalized_shape, numbers.Integral):
             normalized_shape = (normalized_shape,)
         normalized_shape = torch.Size(normalized_shape)
 
-        # 学习weight和bias
+        assert len(normalized_shape) == 1
+
         self.weight = nn.Parameter(torch.ones(normalized_shape))
         self.bias = nn.Parameter(torch.zeros(normalized_shape))
+        self.normalized_shape = normalized_shape
 
     def forward(self, x):
-        # 计算均值mu和方差sigma
         mu = x.mean(-1, keepdim=True)
         sigma = x.var(-1, keepdim=True, unbiased=False)
 
-        # 用均值和方差进行归一化，再乘weight加bias
         return (x - mu) / torch.sqrt(sigma + 1e-5) * self.weight + self.bias
-
 
 
 class LayerNorm(nn.Module):
@@ -70,15 +63,10 @@ class LayerNorm(nn.Module):
         return to_4d(self.body(to_3d(x)), d, h, w)
 
 class DepthWiseConv3d(nn.Module):
-    # 先进行深度卷积（每个通道独立卷积），然后再通过 1x1x1 的卷积进行通道融合
-    # 用于减少卷积操作计算量和参数
     def __init__(self, in_channels, out_channels, kernel_size, padding, stride, bias=True):
-        # 初始化深度卷积和1x1卷积
         super(DepthWiseConv3d, self).__init__()
-        # 深度卷积：每个通道独立进行卷积操作 -> 独立提取特征
         self.net = nn.Sequential(nn.Conv3d(in_channels, in_channels, kernel_size=kernel_size, padding=padding, groups=in_channels, stride=stride, bias=bias),
             nn.BatchNorm2d(in_channels), nn.ReLU(),
-            # 1x1卷积：在所有通道上做融合
             nn.Conv3d(in_channels, out_channels, kernel_size=1, bias=bias),
             nn.BatchNorm2d(out_channels))
     def forward(self, x):
@@ -87,18 +75,18 @@ class DepthWiseConv3d(nn.Module):
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, bias=False):
         super(Mlp, self).__init__()
-        # 映射到高维
+
         self.project_in = nn.Conv3d(in_features, hidden_features, kernel_size=1, bias=bias)
-        # 深度卷积，只在空间维度进行卷积
+
         self.dwconv = nn.Conv3d(hidden_features, hidden_features, kernel_size=3, stride=1, padding=1,
                                 groups=hidden_features, bias=bias)
-        # 输出维度，恢复到输入的维度
+
         self.project_out = nn.Conv3d(hidden_features // 2, in_features, kernel_size=1, bias=bias)
 
     def forward(self, x):
         x = self.project_in(x)
         x1, x2 = self.dwconv(x).chunk(2, dim=1)
-        x = F.gelu(x1) * x2 # gelu 捕捉细微特征
+        x = F.gelu(x1) * x2
         x = self.project_out(x)
         return x
 
@@ -215,7 +203,7 @@ class Block3D(nn.Module):
         y = self.text_lora(y.squeeze(1)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
         x = x * self.c_attn(x, y)
         x = self.norm2(x)
-        x = x + self.drop_path(self.mlp(x)) # 每次前向传播时，它会随机决定是否跳过 MLP 这一层的输出，从而使得不同的层在不同的训练步骤中有机会被跳过
+        x = x + self.drop_path(self.mlp(x))
         return self.norm3(x)
 
 class Basic_block(nn.Module):

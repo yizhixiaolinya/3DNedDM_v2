@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
 #SBATCH -t 5-00:00:00
-#SBATCH --output=/home_data/home/linxin2024/code/3DMedDM_v2/save/bash/run.out
+#SBATCH --output=/home_data/home/linxin2024/code/3DMedDM_v2/save/bash/train_cliploss.out
 
 # 创建日志目录（如果不存在）
 mkdir -p /home_data/home/linxin2024/code/3DMedDM_v2/save/bash
@@ -20,4 +20,4 @@ source /home_data/home/linxin2024/anaconda3/bin/activate synthesis
 cd /home_data/home/linxin2024/code/3DMedDM_v2
 
 # 执行任务
-python /home_data/home/linxin2024/code/3DMedDM_v2/demo.py
+python /home_data/home/linxin2024/code/3DMedDM_v2/train.py

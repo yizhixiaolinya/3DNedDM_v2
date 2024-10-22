@@ -13,45 +13,30 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-# add clip_loss
-import yaml
-from CLIP.model import CLIP # 2D
-from utils_clip import load_config_file
-import torchvision.transforms as transforms
-
 def eval_psnr(loader, model):
-    """评估模型信噪比"""
     model.eval()
-    # 初始化度量函数和结果累加器
     metric_fn = calc_psnr
     val_res1 = Averager()
     val_res0 = Averager()
 
-    with torch.no_grad():  # 将无梯度计算移到循环外
-        for batch in tqdm(loader, leave=False, desc='val'):
-            for k, v in batch.items():
-                batch[k] = v.cuda().float()
-            seq_src = batch['seq_src']
-            seq_tgt = batch['seq_tgt']
-            tgt_hr = batch['tgt_hr']
-            src_hr = batch['src_hr']
-            
-            pre_src_tgt, pre_tgt_src = model(src_hr, tgt_hr, seq_src, seq_tgt)
+    pbar = tqdm(loader, leave=False, desc='val')
+    for batch in pbar:
+        for k, v in batch.items():
+            batch[k] = v.cuda().float()
+        src_lr = batch['src_lr'].unsqueeze(1)
+        tgt_lr = batch['tgt_lr'].unsqueeze(1)
+        with torch.no_grad():
+            pre_src_tgt, pre_tgt_src, _, _ = model(src_lr, tgt_lr, batch['coord_hr'], batch['seq_src'], batch['seq_tgt'])
+                 
+        res0 = metric_fn(pre_src_tgt, batch['tgt_hr'])
+        res1 = metric_fn(pre_tgt_src, batch['src_hr'])
+ 
+        val_res0.add(res0.item(), batch['src_hr'].shape[0])
+        val_res1.add(res1.item(), batch['src_hr'].shape[0])
 
-            res0 = metric_fn(pre_src_tgt, tgt_hr)
-            res1 = metric_fn(pre_tgt_src, src_hr)
-
-            val_res0.add(res0.item(), src_hr.shape[0])
-            val_res1.add(res1.item(), src_hr.shape[0])
-
-    return val_res0.item(), val_res1.item()
-
+    return val_res0.item(),val_res1.item()
 
 def percentile_clip(input_tensor, reference_tensor=None, p_min=0.01, p_max=99.9, strictlyPositive=True):
-    """
-    The percentile_clip function clips the values of an input tensor to specified percentiles and normalizes them to the range [0, 1]. This is useful for preprocessing data.
-    :param input_tensor: The input tensor to be clipped and normalized.
-    """
     if(reference_tensor == None):
         reference_tensor = input_tensor
     v_min, v_max = np.percentile(reference_tensor, [p_min,p_max]) #get p_min percentile and p_max percentile
@@ -69,9 +54,6 @@ def random_selection(input_list):
     return selected_numbers
 
 class Loss_CC(torch.nn.Module):
-    """
-    The Loss_CC class defines a custom loss function that computes the correlation coefficient loss between feature maps.
-    """
     def __init__(self) -> None:
         super().__init__()
     
@@ -87,9 +69,7 @@ class Loss_CC(torch.nn.Module):
         return loss
     
 class Averager():
-    """
-    The Averager class is a utility to compute the running average of values, which is useful for tracking metrics during training or evaluation
-    """
+
     def __init__(self):
         self.n = 0.0
         self.v = 0.0
@@ -229,9 +209,6 @@ def write_img(vol, out_path, ref_path, new_spacing=None):
     print('Save to:', out_path)
 
 class GANLoss(nn.Module):
-    """
-    The GANLoss class defines a loss function for Generative Adversarial Networks (GANs), supporting both least-squares and binary cross-entropy loss.
-    """
     def __init__(self, use_lsgan=True, target_real_label=1.0, target_fake_label=0.0,
                  tensor=torch.FloatTensor):
         super(GANLoss, self).__init__()
@@ -267,52 +244,3 @@ class GANLoss(nn.Module):
         target_tensor = self.get_target_tensor(input, target_is_real)
         return self.loss(input, target_tensor)
 
-# # add CLIP loss
-# class CLIPLoss(nn.Module):
-#     def __init__(self, device, lambda_direction=1.0, lambda_global=0.8, config_path='/home_data/home/linxin2024/code/3DMedDM_v2/CLIP/model_config.yaml', checkpoint_path=None):
-#         super(CLIPLoss, self).__init__()
-#         self.device = device
-#
-#         # 加载 CLIP 模型的配置文件
-#         model_config = load_config_file(config_path)
-#
-#         # 使用加载的配置初始化 CLIP 模型
-#         model_params = dict(model_config['RN50'])
-#         model_params['vision_layers'] = tuple(model_params['vision_layers'])
-#         model_params['vision_patch_size'] = None  # 设置为 None，如果不使用 Patch embedding
-#
-#         self.model = CLIP(**model_params).to(self.device)
-#
-#         # 加载模型权重
-#         if checkpoint_path:
-#             checkpoint = torch.load(checkpoint_path)
-#             state_dict = checkpoint['model_state_dict']
-#             self.model.load_state_dict(state_dict)
-#             print(f"Checkpoint loaded from {checkpoint_path}")
-#
-#         # 初始化损失权重
-#         self.lambda_global = lambda_global
-#         self.lambda_direction = lambda_direction
-#
-#         # 定义损失函数
-#         self.direction_loss = nn.CosineSimilarity(dim=-1)
-#         self.global_loss = nn.L1Loss()
-#
-#     def forward(self, src_img, source_class, target_img, target_class):
-#         # 使用模型进行前向计算
-#         src_features = self.model.encode_image(src_img)
-#         tgt_features = self.model.encode_image(target_img)
-#
-#         clip_loss = 0.0  # 初始化损失为 0
-#
-#         # 计算全局损失，如果 lambda_global > 0
-#         if self.lambda_global:
-#             global_loss = self.global_loss_fn(src_features, tgt_features)
-#             clip_loss += self.lambda_global * global_loss
-#
-#         # 计算方向损失，如果 lambda_direction > 0
-#         if self.lambda_direction:
-#             direction_loss = 1 - self.direction_loss_fn(src_features, tgt_features).mean()
-#             clip_loss += self.lambda_direction * direction_loss
-#
-#         return clip_loss  # 分别返回组合损失和独立损失

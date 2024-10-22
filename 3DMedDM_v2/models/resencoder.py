@@ -42,7 +42,6 @@ class ResBlock(nn.Module):
 
 
 class Upsampler(nn.Sequential):
-    # 增加分辨率
     def __init__(self, conv, scale, n_feats, bn=True, act=False, bias=True):
 
         m = []

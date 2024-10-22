@@ -1,12 +1,12 @@
-#resume: /home_data/home/linxin2024/code/3DMedDM_v2/save/train/_train_lccd_sr/epoch-300.pth
+#resume: /public/home/v-wangyl/wo_text_vit/BMLIP/save_1/_train_lccd_sr/epoch-300.pth
 train_dataset:
   dataset:
     name: paired-image-folders
     args:
-      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_img.txt
-      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_img.txt
-      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_prompt.txt
-      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_prompt.txt
+      root_path_1: D:\3DMedDM_v2\data_try\train/train_T1_img.txt
+      root_path_2: D:\3DMedDM_v2\data_try\train/train_FLAIR_img.txt
+      prompt_D1_M1: D:\3DMedDM_v2\data_try\train/train_T1_prompt.txt
+      prompt_D1_M2: D:\3DMedDM_v2\data_try\train/train_FLAIR_prompt.txt
       repeat: 1
       cache: in_memory
   wrapper:
@@ -15,7 +15,7 @@ train_dataset:
       # inp_size: 60
       scale_min: 1
       scale_max: 3
-      augment: true # 数据增强
+      augment: true
       sample_q: 8000
       
   batch_size: 2
@@ -24,10 +24,10 @@ val_dataset:
   dataset:
     name: paired-image-folders
     args:
-      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_img.txt
-      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_img.txt
-      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_prompt.txt
-      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_prompt.txt
+      root_path_1: D:\3DMedDM_v2\data_try\train/train_T1_img.txt
+      root_path_2: D:\3DMedDM_v2\data_try\train/train_FLAIR_img.txt
+      prompt_D1_M1: D:\3DMedDM_v2\data_try\train/train_T1_prompt.txt
+      prompt_D1_M2: D:\3DMedDM_v2\data_try\train/train_FLAIR_prompt.txt
       repeat: 1
       cache: in_memory
   wrapper:
@@ -51,7 +51,7 @@ model_G:
         no_upsampling: true
         #scale: 1
     no_imnet: False
-
+      
 model_D:
   name: NLDiscri
   args:
@@ -59,11 +59,11 @@ model_D:
     out_dim: 864
     hidden_list: [256, 256, 256, 256]
 
-optimizer_G: # 生成器
+optimizer_G:
   name: adam
   args:
     lr: 1.e-4
-optimizer_D: # 判别器
+optimizer_D:
   name: adam
   args:
     lr: 1.e-4
