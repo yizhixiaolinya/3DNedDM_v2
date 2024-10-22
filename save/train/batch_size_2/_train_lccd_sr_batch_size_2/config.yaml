@@ -11,6 +11,8 @@ train_dataset:
   wrapper:
     name: sr-implicit-paired
     args:
+      scale_min: 1
+      scale_max: 3
       augment: true
       sample_q: 8000
   batch_size: 2
@@ -27,6 +29,8 @@ val_dataset:
   wrapper:
     name: sr-implicit-paired
     args:
+      scale_min: 1
+      scale_max: 3
       augment: true
       sample_q: 8000
   batch_size: 2
@@ -67,10 +71,3 @@ multi_step_lr:
   gamma: 0.5
 epoch_val: 10
 epoch_save: 10
-training_params:
-  patch_size:
-  - 32
-  - 32
-  - 32
-  overlap_ratio: 0.25
-  patch_batch_size: 32

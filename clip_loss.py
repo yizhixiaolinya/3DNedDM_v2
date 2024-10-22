@@ -3,15 +3,14 @@ import torch.nn.functional as F
 import numpy as np
 from torchvision import transforms
 from CLIP.model import CLIP
+from utils_clip.simple_tokenizer import SimpleTokenizer
 import yaml
 from utils_clip import load_config_file
 
 class DirectionLoss(torch.nn.Module):
     def __init__(self, loss_type='mse'):
         super(DirectionLoss, self).__init__()
-
         self.loss_type = loss_type
-
         self.loss_func = {
             'mse':    torch.nn.MSELoss(),
             'cosine': torch.nn.CosineSimilarity(dim=1),
@@ -30,17 +29,21 @@ class CLIPLoss(torch.nn.Module):
 
         self.device = device
 
+        checkpoint_path = '/public_bme/home/linxin/13119176/checkpoint_CLIP.pt'
         MODEL_CONFIG_PATH = 'CLIP/model_config.yaml'
         model_config = load_config_file(MODEL_CONFIG_PATH)
 
+        self.tokenizer = SimpleTokenizer()
         model_params = dict(model_config.RN50)
         model_params['vision_layers'] = tuple(model_params['vision_layers'])
         model_params['vision_patch_size'] = None
-        # 初始化模型
+
+        # 初始化模型并移动到设备上
         self.model = CLIP(**model_params).to(self.device)
 
-        # 如果有预训练权重，可以在此加载
-        state_dict = torch.load('/public_bme/home/linxin/13119176/checkpoint_CLIP.pt', map_location=self.device)
+        # 加载预训练的模型权重，确保权重也在正确的设备上
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        state_dict = checkpoint['model_state_dict']
         self.model.load_state_dict(state_dict)
 
         self.target_direction = None
@@ -65,104 +68,132 @@ class CLIPLoss(torch.nn.Module):
         text_features = text_features.squeeze(1)  # 变为 (batch_size, 768)
         return text_features.to(self.device)
 
-    def encode_images(self, images: torch.Tensor) -> torch.Tensor:
-        images = images.to(self.device)
-        images = images.float()
+    def crop_img(self,images,crop_size):
+        H, W, D = images.shape[1], images.shape[2], images.shape[3]
 
-        # 将图像归一化到 [0, 1]
-        images = (images - images.min()) / (images.max() - images.min())
+        start_h = (H - crop_size) // 2
+        start_w = (W - crop_size) // 2
+        start_d = (D - crop_size) // 2
 
-        # 将图像的类型转换为模型的权重类型
-        images = images.type(self.model.dtype)
+        # Perform the cropping by slicing
+        cropped_images = images[:,
+                         start_h:start_h + crop_size,
+                         start_w:start_w + crop_size,
+                         start_d:start_d + crop_size]
+        return cropped_images 
 
-        # 编码图像
-        return self.model.encode_image(images)
+    def resize_img(self, x, length=96):
+        # 调整影像的大小为 (1, 96, 96, 96)
+        d0 = length - x.shape[1]
+        d1 = length - x.shape[2]
+        d2 = length - x.shape[3]
 
-    def get_image_features(self, images: torch.Tensor) -> torch.Tensor:
-        with torch.no_grad():
-            image_features = self.encode_images(images)
-            image_features /= image_features.norm(dim=-1, keepdim=True)
+        if d0 < 0:
+            x = x[:-abs(d0)]  # crop
+        elif d0 > 0:
+            padding0 = torch.zeros(d0, x.shape[1], x.shape[2])
+            x = torch.cat([x, padding0], dim=0)  # padding
+
+        if d1 < 0:
+            x = x[:, :-abs(d1), :]
+        elif d1 > 0:
+            padding1 = torch.zeros(x.shape[0], d1, x.shape[2])
+            x = torch.cat([x, padding1], dim=1)
+
+        if d2 < 0:
+            x = x[:, :, :-abs(d2)]
+        elif d2 > 0:
+            padding2 = torch.zeros(x.shape[0], x.shape[1], d2)
+            x = torch.cat([x, padding2], dim=2)
+
+        return x
+
+    def get_image_features(self, img: torch.Tensor) -> torch.Tensor:
+        # 确保图像的形状和数据类型正确
+        images = img.to(self.device).float()
+        # 编码图像特征
+        images = images.reshape(images.shape[-4], images.shape[-3], images.shape[-2], images.shape[-1])
+        images = self.crop_img(images, 96)
+        images = images.unsqueeze(1)
+        image_features = self.model.encode_image(images)
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         return image_features
 
-    def compute_img2img_direction(self, source_images: torch.Tensor, target_images: torch.Tensor) -> torch.Tensor:
-        with torch.no_grad():
-            src_encoding = self.get_image_features(source_images)
-            src_encoding = src_encoding.mean(dim=0, keepdim=True)
-
-            target_encodings = self.get_image_features(target_images)
-            target_encodings = target_encodings.mean(dim=0, keepdim=True)
-
-            direction = target_encodings - src_encoding
-            direction /= direction.norm(dim=-1, keepdim=True)
-
-        return direction
-
-    def set_text_features(self, source_class_features: torch.Tensor, target_class_features: torch.Tensor) -> None:
-        source_features = source_class_features.squeeze(1)  # (batch_size, 768)
+    def set_text_features(self, src_seq_features: torch.Tensor, tgt_seq_features: torch.Tensor) -> None:
+        source_features = src_seq_features.squeeze(1)  # (batch_size, 768)
         source_features = source_features.mean(dim=0, keepdim=True)
         self.src_text_features = source_features / source_features.norm(dim=-1, keepdim=True)
 
-        target_features = target_class_features.squeeze(1)  # (batch_size, 768)
+        target_features = tgt_seq_features.squeeze(1)  # (batch_size, 768)
         target_features = target_features.mean(dim=0, keepdim=True)
         self.target_text_features = target_features / target_features.norm(dim=-1, keepdim=True)
 
-    def clip_angle_loss(self, src_img: torch.Tensor, source_class: torch.Tensor, target_img: torch.Tensor,
-                        target_class: torch.Tensor) -> torch.Tensor:
+    def clip_angle_loss(self, src_img: torch.Tensor, src_seq: torch.Tensor, tgt_img: torch.Tensor,
+                        tgt_seq: torch.Tensor) -> torch.Tensor:
         if self.src_text_features is None:
-            self.set_text_features(source_class, target_class)
+            self.set_text_features(src_seq, tgt_seq)
 
-        cos_text_angle = (self.target_text_features @ self.src_text_features.T).clamp(-1, 1)
+        cos_text_angle = (self.target_text_features @ self.src_text_features.T)
+        cos_text_angle = cos_text_angle.clamp(-1, 1)
         text_angle = torch.acos(cos_text_angle)
 
         src_img_features = self.get_image_features(src_img)
-        target_img_features = self.get_image_features(target_img)
+        tgt_img_features = self.get_image_features(tgt_img)
 
-        cos_img_angle = (target_img_features * src_img_features).sum(dim=-1, keepdim=True).clamp(-1, 1)
+        cos_img_angle = (tgt_img_features * src_img_features).sum(dim=-1, keepdim=True)
+        cos_img_angle = cos_img_angle.clamp(-1, 1)
         img_angle = torch.acos(cos_img_angle)
 
         return self.angle_loss(img_angle, text_angle)
 
-    def clip_directional_loss(self, src_img: torch.Tensor, source_class: torch.Tensor, target_img: torch.Tensor,
-                              target_class: torch.Tensor) -> torch.Tensor:
+    def clip_directional_loss(self, src_img: torch.Tensor, src_seq: torch.Tensor, tgt_img: torch.Tensor,
+                              tgt_seq: torch.Tensor) -> torch.Tensor:
+        src_seq = self.encode_text(src_seq) # 将(b,1,768)变为(b,768)
+        tgt_seq = self.encode_text(tgt_seq)
         if self.target_direction is None:
-            self.target_direction = (target_class - source_class).mean(dim=0, keepdim=True)
-            self.target_direction /= self.target_direction.norm(dim=-1, keepdim=True)
+            self.target_direction = (tgt_seq - src_seq).mean(dim=0, keepdim=True)
+            self.target_direction = self.target_direction / self.target_direction.norm(dim=-1, keepdim=True)
 
         src_encoding = self.get_image_features(src_img)
-        target_encoding = self.get_image_features(target_img)
+        target_encoding = self.get_image_features(tgt_img)
 
         edit_direction = (target_encoding - src_encoding)
-        edit_direction /= (edit_direction.norm(dim=-1, keepdim=True) + 1e-7)
+        edit_direction = edit_direction / (edit_direction.norm(dim=-1, keepdim=True) + 1e-7)
         return self.direction_loss(edit_direction, self.target_direction).mean()
 
-    def global_clip_loss(self, img: torch.Tensor, text_features: torch.Tensor) -> torch.Tensor:
-        tokens = text_features.squeeze(1)  # (batch_size, 768)
-        tokens = tokens.to(self.device)
-        tokens /= tokens.norm(dim=-1, keepdim=True)
+    def global_clip_loss(self, img: torch.Tensor, tgt_seq: torch.Tensor) -> torch.Tensor:
+        # 确保通道维度为1
+        tgt_seq = tgt_seq.to(self.device)
+        tgt_seq = tgt_seq / tgt_seq.norm(dim=-1, keepdim=True)
 
-        images = img.to(self.device)
-        images = images.float()
-        images = (images - images.min()) / (images.max() - images.min())
+        image_features = self.get_image_features(img)
 
-        image_features = self.model.encode_image(images)
-        image_features /= image_features.norm(dim=-1, keepdim=True)
-
-        logits_per_image = image_features @ tokens.T
-
+        #logits_per_image = image_features @ tokens.T#TODO 乖乖 这里你明早一定要看一下 BERT处理text的步骤 token并不是sentence的feature
+        print(image_features.shape,'image features')
+        tgt_seq = tgt_seq.reshape(tgt_seq.shape[0],tgt_seq.shape[2])
+        logits_per_image = image_features @ tgt_seq.T
         return (1. - logits_per_image / 100).mean()
 
-    def forward(self, src_img: torch.Tensor, source_class: torch.Tensor, target_img: torch.Tensor,
-                target_class: torch.Tensor):
+    def forward(self, src_img: torch.Tensor, src_seq: torch.Tensor, tgt_img: torch.Tensor,
+                tgt_seq: torch.Tensor):
         clip_loss = 0.0
 
+        print(f"img shape before loss: {src_img.shape}")  # ([2, 1, 144, 192, 192])
+        print(f"sqe shape before loss: {src_seq.shape}")
+
+        # 比较图像和文本的特征向量，计算它们之间的相似度
         if self.lambda_global:
-            clip_loss += self.lambda_global * self.global_clip_loss(target_img, target_class)
+            clip_loss += self.lambda_global * self.global_clip_loss(tgt_img, tgt_seq)
+        print('global loss is done')
 
+        # 计算源图像和目标图像的特征向量之间的方向差异，并与文本方向进行比较。
         if self.lambda_direction:
-            clip_loss += self.lambda_direction * self.clip_directional_loss(src_img, source_class, target_img,
-                                                                            target_class)
+            clip_loss += self.lambda_direction * self.clip_directional_loss(src_img, src_seq, tgt_img, tgt_seq)
+        print('direction loss is done')
 
+        # 计算源图像和目标图像的特征向量之间的角度差异，并与文本角度进行比较。
         if self.lambda_manifold:
-            clip_loss += self.lambda_manifold * self.clip_angle_loss(src_img, source_class, target_img, target_class)
+            clip_loss += self.lambda_manifold * self.clip_angle_loss(src_img, src_seq, tgt_img, tgt_seq)
+        print('manifold loss is done')
 
         return clip_loss

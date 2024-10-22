@@ -155,14 +155,16 @@ def _get_pred(crop_size, overlap_ratio, model, img_vol_0, img_vol_1, coord_size,
         img_1_lr_patch = img_vol_1[start_pos[0]:start_pos[0] + crop_size[0], start_pos[1]:start_pos[1] + crop_size[1], start_pos[2]:start_pos[2] + crop_size[2]]
         img_0_lr_patch = torch.tensor(img_0_lr_patch).cuda().float().unsqueeze(0).repeat(2, 1, 1, 1) # unsqueeze(0) 两次的作用是扩展图像块的维度，使其从 [depth, height, width] 转换为 [batch_size, channels, depth, height, width] 的形状
         img_1_lr_patch = torch.tensor(img_1_lr_patch).cuda().float().unsqueeze(0).repeat(2, 1, 1, 1) 
-        print('img_0_lr_patch.shape:', img_0_lr_patch.shape) # [2, 20, 60, 60] ->(crop_size修改后) [2, 8, 32, 32]
-        print('img_1_lr_patch.shape:', img_1_lr_patch.shape) 
+        # print('img_0_lr_patch.shape:', img_0_lr_patch.shape) # [2, 20, 60, 60] ->(crop_size修改后) [2, 8, 32, 32]
+        # print('img_1_lr_patch.shape:', img_1_lr_patch.shape)
 
         model.eval()
         with torch.no_grad():
             # 将两个图像块 img_0_lr_patch 和 img_1_lr_patch 以及相应的文本嵌入 seq_src 和 seq_tgt 传入模型进行预测，生成预测结果 pred_0_1_patch
             pred_0_1_patch = model(img_0_lr_patch, img_1_lr_patch, seq_src.cuda().float(), seq_tgt.cuda().float())
-            
+            print('img_0_lr_patch.shape',img_0_lr_patch.shape)
+            print('seq_src.shape',seq_src.shape)
+
             # 查看tuple的结构和每个元素的内容
             for idx, item in enumerate(pred_0_1_patch):
                 print(f"Element {idx}: Type: {type(item)}, Shape: {item.shape if isinstance(item, torch.Tensor) else 'N/A'}")
@@ -267,7 +269,7 @@ for idx, (img_0_file_path, img_1_file_path) in enumerate(zip(t1_img_paths, swi_i
     # 对图像进行归一化或去异常值处理
     img_vol_0 = utils.percentile_clip(img_vol_0)
     img_vol_1 = utils.percentile_clip(img_vol_1)
-    print(f"Image {os.path.basename(img_0_file_path)} processed dimensions: {img_vol_0.shape}")
+    print(f"Image {os.path.basename(img_0_file_path)} processed dimensions: {img_vol_0.shape}") # (192, 192, 144)
     print(f"Image {os.path.basename(img_1_file_path)} processed dimensions: {img_vol_1.shape}")
 
     coord_size = [32, 32, 32]

@@ -11,6 +11,7 @@ import datasets
 import models
 
 def make_data_loader(spec, tag=''):
+    '''Create data loader'''
     if spec is None:
         return None
     dataset = datasets.make(spec['dataset'])
@@ -23,27 +24,29 @@ def make_data_loader(spec, tag=''):
 
 
 def make_data_loaders():
+    '''Make data loaders'''
     train_loader = make_data_loader(config.get('train_dataset'), tag='train')
     val_loader = make_data_loader(config.get('val_dataset'), tag='val')
     return train_loader, val_loader
 
 
 def prepare_training():
+    '''Prepare training'''
     if config.get('resume') is not None:
-        sv_file = torch.load(config['resume'])
+        sv_file = torch.load(config['resume']) # 加载训练的模型状态(包括模型、优化器、训练的epoch等)
         model_G = models.make(sv_file['model_G'], load_sd=True).cuda()
 
         optimizer_G = utils.make_optimizer_G(
             model_G.parameters(), sv_file['optimizer_G'], load_sd=True)
 
-        epoch_start = sv_file['epoch'] + 1
+        epoch_start = sv_file['epoch'] + 1 # get epoch
         if config.get('multi_step_lr') is None:
             lr_scheduler_G = None
         else:
             lr_scheduler_G = MultiStepLR(optimizer_G, **config['multi_step_lr'])
 
         for _ in range(epoch_start - 1):
-            lr_scheduler_G.step()
+            lr_scheduler_G.step() # update lr
     else:
         model_G = models.make(config['model_G']).cuda()
 
@@ -78,12 +81,13 @@ def train(train_loader, model_G, optimizer_G):
         src_hr = batch['src_hr'].cuda()
 
         pre_src_tgt, pre_tgt_src = model_G(src_hr, tgt_hr, seq_src, seq_tgt)
+
         loss_src = loss_fn(pre_src_tgt, tgt_hr)
         loss_tgt = loss_fn(pre_tgt_src, src_hr)
 
         loss_G = loss_src * 0.5 + loss_tgt * 0.5
-        loss_0.add(loss_src.item())
-        loss_1.add(loss_tgt.item())
+        loss_0.add(loss_src.item()) # 对应于模型生成的源目标预测与真实目标的损失（loss_src），即源图像经过模型生成后与目标图像的损失
+        loss_1.add(loss_tgt.item()) # 对应于模型生成的目标源预测与真实源图像的损失（loss_tgt），即目标图像经过模型生成后与源图像的损失
 
         optimizer_G.zero_grad()
         loss_G.backward()
@@ -94,7 +98,7 @@ def train(train_loader, model_G, optimizer_G):
 
 def main(config_, save_path):
     global config, log
-    config = config_
+    config = config_ # config_为config.yaml文件中的内容
     log, _ = utils.set_save_path(save_path)
     with open(os.path.join(save_path, 'config.yaml'), 'w') as f:
         yaml.dump(config, f, sort_keys=False)
@@ -120,7 +124,7 @@ def main(config_, save_path):
 
         train_loss = train(train_loader, model_G, optimizer_G)
         if lr_scheduler_G is not None:
-            lr_scheduler_G.step()
+           lr_scheduler_G.step()
         log_info.append('loss0={:.4f}'.format(train_loss[0]))
         log_info.append('loss1={:.4f}'.format(train_loss[1]))
 
@@ -128,6 +132,13 @@ def main(config_, save_path):
             model_G_ = model_G.module
         else:
             model_G_ = model_G
+
+        # Check model_G_ parameters
+        print("Model parameters:")
+        for name, param in model_G_.named_parameters():
+            if param.requires_grad:
+                print(f"{name}: {param.data.shape}")
+
         model_G_spec = config['model_G']
         model_G_spec['sd_G'] = model_G_.state_dict()
         optimizer_G_spec = config['optimizer_G']

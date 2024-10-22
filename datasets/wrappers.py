@@ -5,6 +5,37 @@ import numpy as np
 import utils
 
 @register('sr-implicit-paired')  # 使用register装饰器注册类名为'sr-implicit-paired'
+class SRImplicitPairedFull(Dataset):  # 修改类名
+    '''读取整张图像及对应文本的Dataset类'''
+
+    def __init__(self, dataset, augment=False, sample_q=None):
+        self.dataset = dataset
+        self.augment = augment
+        self.sample_q = sample_q
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        # 从基础数据集中获取整张图像及对应的文本
+        img_src, img_tgt, seq_src, seq_tgt = self.dataset[idx]
+
+        # print(f"Image {idx} shape: src={img_src.shape}, tgt={img_tgt.shape}")  # src=(144, 192, 192), tgt=(144, 192, 192)
+
+        # 对图像进行百分位剪裁
+        img_src = utils.percentile_clip(img_src)
+        img_tgt = utils.percentile_clip(img_tgt)
+
+        return {
+            'src_img': img_src,  # 源图像
+            'tgt_img': img_tgt,  # 目标图像
+            'seq_src': seq_src,  # 源文本序列
+            'seq_tgt': seq_tgt  # 目标文本序列
+        }
+
+
+'''
+# 原始代码：带有随机裁剪
 class SRImplicitPaired(Dataset):  # 定义SRImplicitPaired类，继承自Dataset
 
     def __init__(self, dataset, scale_min=1, scale_max=None, augment=False, sample_q=None):  # 初始化方法
@@ -39,5 +70,5 @@ class SRImplicitPaired(Dataset):  # 定义SRImplicitPaired类，继承自Dataset
             'seq_src': seq_src,
             'seq_tgt': seq_tgt
         }
-
+'''
 

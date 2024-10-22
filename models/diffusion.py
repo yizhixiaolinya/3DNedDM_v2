@@ -343,6 +343,8 @@ class CrossAttention(nn.Module):
         x = x.view(b, n, -1).permute(0, 2, 1)
         h = self.heads
         y = self.text_lora(y)
+        # print('x:',x)
+        # print('y:',y)
 
         queries = self.query(x)
         keys = self.key(y)
@@ -547,15 +549,13 @@ class UNet(nn.Module):
         )
 
     def forward(self, x, timesteps, y):
-        hs = []
-        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
-
-        # print('forward')
-        # print(f"x before input_blocks: {x.shape}")
+        # print('UNet forward called')
+        # print(f"x before input_blocks: {x.shape}")  # 应为([2, 1, 32, 32, 32])
 
         h = x.type(self.dtype)
+        hs = []
         for module in self.input_blocks:
-            h = module(h, emb)
+            h = module(h, self.time_embed(timestep_embedding(timesteps, self.model_channels)))
             hs.append(h)
             # print(f"Shape after input block: {h.shape}")
 
@@ -563,20 +563,20 @@ class UNet(nn.Module):
             if isinstance(module, CrossAttention):
                 h = module(h, y)
             elif isinstance(module, AttentionBlock):
-                x = module(h)
+                h = module(h)
             else:
-                x = module(h, emb)
+                h = module(h, self.time_embed(timestep_embedding(timesteps, self.model_channels)))
             # print(f"Shape after middle block: {h.shape}")
 
         for module in self.output_blocks:
-            # 检查维度是否匹配
-            # print(f"h shape: {h.shape}, hs.pop() shape: {hs[-1].shape}")
-            
             h = torch.cat([h, hs.pop()], dim=1)
-            h = module(h, emb)
-            # print(f"Shape after output block: {h.shape}")
+            h = module(h, self.time_embed(timestep_embedding(timesteps, self.model_channels)))
+            # print(f"Shape after output block: {h.shape}")  # ([2, 16, 32, 32, 32])
+
         h = h.type(x.dtype)
-        return self.out(h)
+        output = self.out(h)
+        # print(f"Output shape: {output.shape}")  # ([2, 1, 32, 32, 32])
+        return output
 
 
 def _extract_into_tensor(arr, timesteps, broadcast_shape):

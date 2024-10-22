@@ -13,11 +13,10 @@ train_dataset:
     name: sr-implicit-paired
     args:
       # inp_size: 60
-      scale_min: 1
-      scale_max: 3
+#      scale_min: 1
+#      scale_max: 3
       augment: true # 数据增强
       sample_q: 8000
-      
   batch_size: 2
 
 val_dataset:
@@ -34,11 +33,10 @@ val_dataset:
     name: sr-implicit-paired
     args:
       #inp_size:
-      scale_min: 1
-      scale_max: 3
+#      scale_min: 1
+#      scale_max: 3
       augment: true
       sample_q: 8000
-      
   batch_size: 2
 
 
@@ -76,3 +74,9 @@ multi_step_lr:
 
 epoch_val: 10
 epoch_save: 10
+
+# Add training parameters
+training_params:
+  patch_size: [32, 32, 32]
+  overlap_ratio: 0.25
+  patch_batch_size: 32

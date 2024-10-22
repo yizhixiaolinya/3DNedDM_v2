@@ -21,6 +21,7 @@ class LCCD(nn.Module):
         tgt_t = self.diffusion.noise_images(src_lr.unsqueeze(1), tgt_lr.unsqueeze(1), t_2)
         src_out = self.unet(tgt_t, t_2, prompt_src)
 
+
         return tgt_out, src_out
 
 """
