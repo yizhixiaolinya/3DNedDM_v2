@@ -169,7 +169,6 @@ class CLIPLoss(torch.nn.Module):
         image_features = self.get_image_features(img)
 
         #logits_per_image = image_features @ tokens.T#TODO 乖乖 这里你明早一定要看一下 BERT处理text的步骤 token并不是sentence的feature
-        print(image_features.shape,'image features')
         tgt_seq = tgt_seq.reshape(tgt_seq.shape[0],tgt_seq.shape[2])
         logits_per_image = image_features @ tgt_seq.T
         return (1. - logits_per_image / 100).mean()
@@ -178,22 +177,22 @@ class CLIPLoss(torch.nn.Module):
                 tgt_seq: torch.Tensor):
         clip_loss = 0.0
 
-        print(f"img shape before loss: {src_img.shape}")  # ([2, 1, 144, 192, 192])
-        print(f"sqe shape before loss: {src_seq.shape}")
+        # print(f"img shape before loss: {src_img.shape}")  # torch.Size([2, 96, 96, 96])
+        # print(f"sqe shape before loss: {src_seq.shape}") # torch.Size([2, 1, 768])
 
         # 比较图像和文本的特征向量，计算它们之间的相似度
         if self.lambda_global:
             clip_loss += self.lambda_global * self.global_clip_loss(tgt_img, tgt_seq)
-        print('global loss is done')
+        # print('global loss is done')
 
         # 计算源图像和目标图像的特征向量之间的方向差异，并与文本方向进行比较。
         if self.lambda_direction:
             clip_loss += self.lambda_direction * self.clip_directional_loss(src_img, src_seq, tgt_img, tgt_seq)
-        print('direction loss is done')
+        # print('direction loss is done')
 
         # 计算源图像和目标图像的特征向量之间的角度差异，并与文本角度进行比较。
         if self.lambda_manifold:
             clip_loss += self.lambda_manifold * self.clip_angle_loss(src_img, src_seq, tgt_img, tgt_seq)
-        print('manifold loss is done')
+        # print('manifold loss is done')
 
         return clip_loss

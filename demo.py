@@ -228,7 +228,7 @@ psnr_0_1_list = []
 psnr_1_0_list = []
 ssim_0_1_list = []
 ssim_1_0_list = []
-model_pth = '/home_data/home/linxin2024/code/3DMedDM_v2/save/train/batch_size_2/epoch-best.pth'
+model_pth = '/home_data/home/linxin2024/code/3DMedDM_v2/save/train/Loss/_train_lccd_sr_batch_size_2/epoch-last.pth'
 model_img = models.make(torch.load(model_pth)['model_G'], load_sd=True).cuda()
 # print(model_img) -> model_img.out
 
@@ -294,7 +294,7 @@ for idx, (img_0_file_path, img_1_file_path) in enumerate(zip(t1_img_paths, swi_i
 
     # 保存从T1到SWI的图像
     new_spacing_1 = set_new_spacing(img_1_spacing, coord_size, crop_size)
-    output_file_0_1 = os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo', f'T12SWI_{idx}.nii.gz')
+    output_file_0_1 = os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo/clip?L1_loss', f'T12SWI_{idx}.nii.gz')
     utils.write_img(pred_0_1, output_file_0_1, img_1_file_path, new_spacing=new_spacing_1)
 
     # 通过模型进行预测，从SWI到T1
@@ -302,7 +302,7 @@ for idx, (img_0_file_path, img_1_file_path) in enumerate(zip(t1_img_paths, swi_i
 
     # 保存从SWI到T1的图像
     new_spacing_0 = set_new_spacing(img_0_spacing, coord_size, crop_size)
-    output_file_1_0 = os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo', f'SWI2T1_{idx}.nii.gz')
+    output_file_1_0 = os.path.join('/home_data/home/linxin2024/code/3DMedDM_v2/save/demo/clip?L1_loss', f'SWI2T1_{idx}.nii.gz')
     utils.write_img(pred_1_0, output_file_1_0, img_0_file_path, new_spacing=new_spacing_0)
 
     # utils.write_img(pred_1_0, os.path.join('/public/home/v-wangyl/wo_text_vit/BMLIP/results/AIBL/', 'PD_T1_'+i), os.path.join(img_path_0, i),new_spacing=new_spacing_0)

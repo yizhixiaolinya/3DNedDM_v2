@@ -69,11 +69,11 @@ class AttentionPool3d(nn.Module):
 
     def forward(self, x):
         x = x.reshape(x.shape[0], x.shape[1], x.shape[2] * x.shape[3]*x.shape[4]).permute(2, 0, 1)  # NCHWD -> (HWD)NC
-        print(f"x1: {x.shape}")
+        # print(f"x1: {x.shape}") # torch.Size([27, 2, 8192])
         x = torch.cat([x.mean(dim=0, keepdim=True), x], dim=0)  # (HWD+1)NC
-        print(f"x2: {x.shape}")
+        # print(f"x2: {x.shape}") # x2: torch.Size([28, 2, 8192])
         x = x + self.positional_embedding[:, None, :].to(x.dtype)  # (HWD+1)NC
-        print(f"x3: {x.shape}")
+        # print(f"x3: {x.shape}") # x3: torch.Size([28, 2, 8192])
         x, _ = F.multi_head_attention_forward(
             query=x, key=x, value=x,
             embed_dim_to_check=x.shape[-1],
@@ -144,7 +144,7 @@ class ModifiedResNet(nn.Module):
         #b,c,h,w
         
         def stem(x):
-            print(f"x shape: {x.shape}") # ([1, 1, 144, 192, 192])
+            # print(f"x shape: {x.shape}") # x shape: torch.Size([2, 1, 96, 96, 96])
             for conv, bn in [(self.conv1, self.bn1), (self.conv2, self.bn2), (self.conv3, self.bn3)]:
                 x = self.relu(bn(conv(x)))
             x = self.avgpool(x)
@@ -154,20 +154,20 @@ class ModifiedResNet(nn.Module):
         x = x.type(self.conv1.weight.dtype)
         #2,3,224,224
         x = stem(x)
-        print(f"After stem: {x.shape}") # ([1, 256, 36, 48, 48])
+        # print(f"After stem: {x.shape}") # After stem: torch.Size([2, 256, 24, 24, 24])
         #2,8,56,56
         x = self.layer1(x)
-        print(f"After layer1: {x.shape}") # ([1, 1024, 36, 48, 48])
+        # print(f"After layer1: {x.shape}") # After layer1: torch.Size([2, 1024, 24, 24, 24])
         #2,32,56,56
         x = self.layer2(x)
-        print(f"After layer2: {x.shape}") # ([1, 2048, 18, 24, 24])
+        # print(f"After layer2: {x.shape}") # After layer2: torch.Size([2, 2048, 12, 12, 12])
         #2,64,28,28
         x = self.layer3(x)
-        print(f"After layer3: {x.shape}") # ([1, 4096, 9, 12, 12])
+        # print(f"After layer3: {x.shape}") # After layer3: torch.Size([2, 4096, 6, 6, 6])
         #2,128,14,14
         x = self.layer4(x)
         #2,256,7,7
-        print('x before attnpool:',x.shape) # ([1, 8192, 5, 6, 6])
+        # print('x before attnpool:',x.shape) # x before attnpool: torch.Size([2, 8192, 3, 3, 3])
         x = self.attnpool(x)
         print('a after attnpool:',x.shape)
         #2,64

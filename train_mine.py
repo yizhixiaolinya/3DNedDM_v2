@@ -190,6 +190,9 @@ def train(train_loader, model_G, optimizer_G, patch_size, overlap_ratio, writer,
     clip_loss_s2t = utils.Averager()
     clip_loss_t2s = utils.Averager()
 
+    # 累积每个 batch 的 total loss
+    epoch_loss_total = 0
+
     for batch_idx, batch in enumerate(tqdm(train_loader, leave=False, desc='train')):
         src_imgs = batch['src_img']
         tgt_imgs = batch['tgt_img']
@@ -254,7 +257,7 @@ def train(train_loader, model_G, optimizer_G, patch_size, overlap_ratio, writer,
         # 结果为：True False True True
 
         # For the first 30 epochs, calculate only L1 loss pre_patches_batch_src2tgt, pre_patches_batch_tgt2src
-        if epoch <= 0:
+        if epoch <= 30:
             loss_src2tgt = loss_fn(cropped_src2tgt.cuda(), cropped_tgt.cuda())
             loss_tgt2src = loss_fn(cropped_tgt2src.cuda(), cropped_src.cuda())
             # print('loss_src2tgt:',loss_src2tgt.requires_grad)  # true
@@ -294,12 +297,11 @@ def train(train_loader, model_G, optimizer_G, patch_size, overlap_ratio, writer,
             writer.add_scalar('Loss/cliploss_tgt2src', clip_loss_t2s.item(), epoch * len(train_loader) + batch_idx)
 
         optimizer_G.step()
+        # 累加每个 batch 的 loss_total
+        epoch_loss_total += torch.sum(loss_total)
 
     # 返回整个epoch的累积损失
-    if epoch <= 0:
-        return loss_0.item() + loss_1.item()
-    else:
-        return loss_0.item() + loss_1.item() + clip_loss_total.item()
+    return epoch_loss_total.item()
 
 def main(config_, save_path):
     global config, log
@@ -320,9 +322,15 @@ def main(config_, save_path):
 
     epoch_max = config['epoch_max']
     epoch_val = config.get('epoch_val')
+    # epoch_val = 1 # TODO: for debug
     epoch_save = config.get('epoch_save')
 
-    max_val_v = -1e18
+    # max_val_v = -1e18
+    
+    # 初始化两个最大 PSNR 变量
+    max_val_v_src2tgt = -1e18
+    max_val_v_tgt2src = -1e18
+
     timer = utils.Timer()
 
     for epoch in range(epoch_start, epoch_max + 1):
@@ -352,12 +360,23 @@ def main(config_, save_path):
             torch.save(sv_file, os.path.join(save_path, 'epoch-{}.pth'.format(epoch)))
 
         if (epoch_val is not None) and (epoch % epoch_val == 0):
-            val_res = utils.eval_psnr(val_loader, model_G_)
-            log_info.append('val: psnr={:.4f}'.format(val_res))
+            val_res_src2tgt, val_res_tgt2src = utils.eval_psnr(val_loader, model_G_)
+            print('val_res_src2tgt:', val_res_src2tgt)
+            print('val_res_tgt2src:', val_res_tgt2src)
+            log_info.append('val_src2tgt: psnr={:.4f}'.format(val_res_src2tgt))
+            log_info.append('val_tgt2src: psnr={:.4f}'.format(val_res_tgt2src))
+            
+            # 检查 src2tgt 的 PSNR 是否是历史最佳
+            if val_res_src2tgt > max_val_v_src2tgt:
+                max_val_v_src2tgt = val_res_src2tgt
+                # 保存 src2tgt 最佳模型
+                torch.save(sv_file, os.path.join(save_path, 'epoch-best_src2tgt.pth'))
 
-            if val_res > max_val_v:
-                max_val_v = val_res
-                torch.save(sv_file, os.path.join(save_path, 'epoch-best.pth'))
+            # 检查 tgt2src 的 PSNR 是否是历史最佳
+            if val_res_tgt2src > max_val_v_tgt2src:
+                max_val_v_tgt2src = val_res_tgt2src
+                # 保存 tgt2src 最佳模型
+                torch.save(sv_file, os.path.join(save_path, 'epoch-best_tgt2src.pth'))
 
         t = timer.t()
         prog = (epoch - epoch_start + 1) / (epoch_max - epoch_start + 1)
@@ -366,6 +385,8 @@ def main(config_, save_path):
         log_info.append('{} {}/{}'.format(t_epoch, t_elapsed, t_all))
 
         log(', '.join(log_info))
+
+    print('yeah!!!!')
 
     # 关闭 writer
     writer.close()

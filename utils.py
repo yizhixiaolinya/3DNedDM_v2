@@ -33,8 +33,8 @@ def eval_psnr(loader, model):
                 batch[k] = v.cuda().float()
             seq_src = batch['seq_src']
             seq_tgt = batch['seq_tgt']
-            tgt_hr = batch['tgt_hr']
-            src_hr = batch['src_hr']
+            tgt_hr = batch['tgt_img']
+            src_hr = batch['src_img']
             
             pre_src_tgt, pre_tgt_src = model(src_hr, tgt_hr, seq_src, seq_tgt)
 
@@ -266,53 +266,3 @@ class GANLoss(nn.Module):
     def __call__(self, input, target_is_real):
         target_tensor = self.get_target_tensor(input, target_is_real)
         return self.loss(input, target_tensor)
-
-# # add CLIP loss
-# class CLIPLoss(nn.Module):
-#     def __init__(self, device, lambda_direction=1.0, lambda_global=0.8, config_path='/home_data/home/linxin2024/code/3DMedDM_v2/CLIP/model_config.yaml', checkpoint_path=None):
-#         super(CLIPLoss, self).__init__()
-#         self.device = device
-#
-#         # 加载 CLIP 模型的配置文件
-#         model_config = load_config_file(config_path)
-#
-#         # 使用加载的配置初始化 CLIP 模型
-#         model_params = dict(model_config['RN50'])
-#         model_params['vision_layers'] = tuple(model_params['vision_layers'])
-#         model_params['vision_patch_size'] = None  # 设置为 None，如果不使用 Patch embedding
-#
-#         self.model = CLIP(**model_params).to(self.device)
-#
-#         # 加载模型权重
-#         if checkpoint_path:
-#             checkpoint = torch.load(checkpoint_path)
-#             state_dict = checkpoint['model_state_dict']
-#             self.model.load_state_dict(state_dict)
-#             print(f"Checkpoint loaded from {checkpoint_path}")
-#
-#         # 初始化损失权重
-#         self.lambda_global = lambda_global
-#         self.lambda_direction = lambda_direction
-#
-#         # 定义损失函数
-#         self.direction_loss = nn.CosineSimilarity(dim=-1)
-#         self.global_loss = nn.L1Loss()
-#
-#     def forward(self, src_img, source_class, target_img, target_class):
-#         # 使用模型进行前向计算
-#         src_features = self.model.encode_image(src_img)
-#         tgt_features = self.model.encode_image(target_img)
-#
-#         clip_loss = 0.0  # 初始化损失为 0
-#
-#         # 计算全局损失，如果 lambda_global > 0
-#         if self.lambda_global:
-#             global_loss = self.global_loss_fn(src_features, tgt_features)
-#             clip_loss += self.lambda_global * global_loss
-#
-#         # 计算方向损失，如果 lambda_direction > 0
-#         if self.lambda_direction:
-#             direction_loss = 1 - self.direction_loss_fn(src_features, tgt_features).mean()
-#             clip_loss += self.lambda_direction * direction_loss
-#
-#         return clip_loss  # 分别返回组合损失和独立损失
