@@ -1,4 +1,7 @@
-#resume: /home_data/home/linxin2024/code/3DMedDM_v2/save/train/_train_lccd_sr/epoch-300.pth
+resume: /public_bme/data/linxin_debug/Loss/_train_lccd_sr_batch_size_2/20241025_151214/epoch-last.pth
+ask_user: false  # 是否询问用户是否覆盖已有文件
+remove_save_path: false  # 是否删除已有文件
+
 train_dataset:
   dataset:
     name: paired-image-folders

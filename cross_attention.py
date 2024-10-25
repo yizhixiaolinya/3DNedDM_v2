@@ -32,7 +32,7 @@ def main():
         sequences.append(sequence)
 
     output_sequence = cross_attention_module(sequences)
-    print("Output sequence shape:", output_sequence.shape)
+    # print("Output sequence shape:", output_sequence.shape)
 
 if __name__ == "__main__":
     main()

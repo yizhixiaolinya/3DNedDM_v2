@@ -122,7 +122,6 @@ def time_text(t):
     else:
         return '{:.1f}s'.format(t)
 
-
 _log_path = None
 
 
@@ -138,23 +137,28 @@ def log(obj, filename='log.txt'):
             print(obj, file=f)
 
 
-def ensure_path(path, remove=True):
-    basename = os.path.basename(path.rstrip('/'))
+def ensure_path(path, remove=True, ask_user=False):
     if os.path.exists(path):
-        if remove and (basename.startswith('_')
-                or input('{} exists, remove? (y/[n]): '.format(path)) == 'y'):
+        if remove:
+            if ask_user:
+                try:
+                    response = input(f"{path} exists, remove? (y/[n]): ")
+                    if response.lower() != 'y':
+                        raise FileExistsError(f"Path '{path}' already exists and was not removed.")
+                except EOFError:
+                    # 如果在非交互式环境中运行，自动选择不删除
+                    raise FileExistsError(f"Path '{path}' already exists and was not removed (EOFError).")
+            # 如果选择删除或没有启用用户询问，删除路径
             shutil.rmtree(path)
             os.makedirs(path)
     else:
         os.makedirs(path)
-
-
-def set_save_path(save_path, remove=True):
-    ensure_path(save_path, remove=remove)
+    exit()
+def set_save_path(save_path, remove=True, ask_user=False):
+    ensure_path(save_path, remove=remove, ask_user=ask_user)
     set_log_path(save_path)
     writer = SummaryWriter(os.path.join(save_path, 'tensorboard'))
     return log, writer
-
 
 def compute_num_params(model, text=False):
     tot = int(sum([np.prod(p.shape) for p in model.parameters()]))
@@ -165,7 +169,6 @@ def compute_num_params(model, text=False):
             return '{:.1f}K'.format(tot / 1e3)
     else:
         return tot
-
 
 def make_optimizer_G(param_list, optimizer_spec, load_sd=False):
     Optimizer = {
@@ -204,8 +207,6 @@ def make_coord(shape, ranges=None, flatten=True):
         ret = ret.view(-1, ret.shape[-1])
     return ret
 
-
-
 def calc_psnr(sr, hr):
     diff = (sr - hr) 
     mse = diff.pow(2).mean()
@@ -216,6 +217,7 @@ def write_middle_feature(intermediate_output):
         activation = intermediate_output[0, i, :, :, :]
         plt.savefig(f'./save/layer_{i}_activation_{activation}.png')  # Save each activation as a PNG file
         plt.clf()
+
 def write_img(vol, out_path, ref_path, new_spacing=None):
     img_ref = sitk.ReadImage(ref_path)
     img = sitk.GetImageFromArray(vol)

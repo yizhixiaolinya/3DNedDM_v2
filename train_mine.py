@@ -16,6 +16,8 @@ from itertools import product
 import numpy as np
 import torch.nn.functional as F
 import time
+from datetime import datetime
+
 from torch.utils.tensorboard import SummaryWriter
 import random
 
@@ -40,21 +42,24 @@ def make_data_loaders():
 def prepare_training():
     '''Prepare training'''
     if config.get('resume') is not None:
-        sv_file = torch.load(config['resume'])  # 加载训练的模型状态(包括模型、优化器、训练的epoch等)
+        # 加载最近的训练模型状态
+        sv_file = torch.load(config['resume'])  # 加载模型、优化器、训练的epoch等状态
         model_G = models.make(sv_file['model_G'], load_sd=True).cuda()
 
         optimizer_G = utils.make_optimizer_G(
             model_G.parameters(), sv_file['optimizer_G'], load_sd=True)
 
-        epoch_start = sv_file['epoch'] + 1  # get epoch
+        epoch_start = sv_file['epoch'] + 1  # 继续从上次的 epoch 开始
         if config.get('multi_step_lr') is None:
             lr_scheduler_G = None
         else:
             lr_scheduler_G = MultiStepLR(optimizer_G, **config['multi_step_lr'])
 
+        # 更新学习率调度器
         for _ in range(epoch_start - 1):
-            lr_scheduler_G.step()  # update lr
+            lr_scheduler_G.step()
     else:
+        # 从头开始训练
         model_G = models.make(config['model_G']).cuda()
 
         optimizer_G = utils.make_optimizer_G(
@@ -63,7 +68,6 @@ def prepare_training():
         epoch_start = 1
         if config.get('multi_step_lr') is None:
             lr_scheduler_G = None
-
         else:
             lr_scheduler_G = MultiStepLR(optimizer_G, **config['multi_step_lr'])
 
@@ -252,16 +256,12 @@ def train(train_loader, model_G, optimizer_G, patch_size, overlap_ratio, writer,
         cropped_tgt = cropped_tgt.unsqueeze(1).cuda().float()
         cropped_src2tgt = cropped_src2tgt.unsqueeze(1).cuda().float()
         cropped_tgt2src = cropped_tgt2src.unsqueeze(1).cuda().float()
-        # print('requires_grad?')
-        # print(cropped_src.requires_grad, cropped_tgt.requires_grad, cropped_src2tgt.requires_grad, cropped_tgt2src.requires_grad)
-        # 结果为：True False True True
+
 
         # For the first 30 epochs, calculate only L1 loss pre_patches_batch_src2tgt, pre_patches_batch_tgt2src
         if epoch <= 30:
             loss_src2tgt = loss_fn(cropped_src2tgt.cuda(), cropped_tgt.cuda())
             loss_tgt2src = loss_fn(cropped_tgt2src.cuda(), cropped_src.cuda())
-            # print('loss_src2tgt:',loss_src2tgt.requires_grad)  # true
-            # print('loss_tgt2src',loss_tgt2src.requires_grad)  # true
             loss_total = loss_src2tgt * 0.5 + loss_tgt2src * 0.5
             loss_0.add(loss_src2tgt.item())  # 对应于模型生成的源目标预测与真实目标的损失（loss_src），即源图像经过模型生成后与目标图像的损失
             loss_1.add(loss_tgt2src.item())
@@ -296,6 +296,8 @@ def train(train_loader, model_G, optimizer_G, patch_size, overlap_ratio, writer,
             writer.add_scalar('Loss/cliploss_src2tgt', clip_loss_s2t.item(), epoch * len(train_loader) + batch_idx)
             writer.add_scalar('Loss/cliploss_tgt2src', clip_loss_t2s.item(), epoch * len(train_loader) + batch_idx)
 
+        # print('epoch:', epoch)
+        # print('epoch * len(train_loader) + batch_idx:', epoch * len(train_loader) + batch_idx)
         optimizer_G.step()
         # 累加每个 batch 的 loss_total
         epoch_loss_total += torch.sum(loss_total)
@@ -306,10 +308,24 @@ def train(train_loader, model_G, optimizer_G, patch_size, overlap_ratio, writer,
 def main(config_, save_path):
     global config, log
     config = config_  # config_为config.yaml文件中的内容
-    log, _ = utils.set_save_path(save_path)
+
+    # 从配置中获取是否询问用户
+    ask_user = config.get('ask_user', False)
+    # print('ask_user:', ask_user)
+
+    # 当 resume 不为空时，不删除已有路径，保留日志和其他文件
+    if config.get('resume') is not None:
+        remove_save_path = False
+    else:
+        # 如果不从检查点继续训练，可以根据需要决定是否删除
+        remove_save_path = config.get('remove_save_path', True)  # 从配置中获取，默认删除
+    
+    # print('remove_save_path:', remove_save_path,flush=True)
+    # 设置保存路径，传递 remove 和 ask_user 参数
+    log, writer = utils.set_save_path(save_path, remove=remove_save_path, ask_user=ask_user)
 
     # 初始化 TensorBoard
-    writer = SummaryWriter(log_dir=os.path.join(save_path, 'tensorboard'))
+    # writer 已经在 set_save_path 中初始化
 
     with open(os.path.join(save_path, 'config.yaml'), 'w') as f:
         yaml.dump(config, f, sort_keys=False)
@@ -320,13 +336,14 @@ def main(config_, save_path):
     train_loader, val_loader = make_data_loaders()
     model_G, optimizer_G, epoch_start, lr_scheduler_G = prepare_training()
 
+    # 在 `epoch_start` 变量定义后打印
+    # print('epoch_start:', epoch_start)
+    resumed_epoch = epoch_start  # 继续训练的起始 epoch
+
     epoch_max = config['epoch_max']
     epoch_val = config.get('epoch_val')
-    # epoch_val = 1 # TODO: for debug
     epoch_save = config.get('epoch_save')
 
-    # max_val_v = -1e18
-    
     # 初始化两个最大 PSNR 变量
     max_val_v_src2tgt = -1e18
     max_val_v_tgt2src = -1e18
@@ -354,28 +371,31 @@ def main(config_, save_path):
         optimizer_G_spec['sd_G'] = optimizer_G.state_dict()
         sv_file = {'model_G': model_G_spec, 'optimizer_G': optimizer_G_spec, 'epoch': epoch}
 
+        # 保存最新的 epoch-last.pth
+        
         torch.save(sv_file, os.path.join(save_path, 'epoch-last.pth'))
 
-        if (epoch_save is not None) and (epoch % epoch_save == 0):
-            torch.save(sv_file, os.path.join(save_path, 'epoch-{}.pth'.format(epoch)))
+        # 只有当 epoch 超过上次中断时，才保存 epoch-{epoch}.pth
+        if (epoch_save is not None) and (epoch % epoch_save == 0) and (epoch > resumed_epoch):
+            checkpoint_path = os.path.join(save_path, f'epoch-{epoch}.pth')
+            # 检查是否已经存在该 epoch 的文件
+            if not os.path.exists(checkpoint_path):
+                torch.save(sv_file, checkpoint_path)
 
+        # 评估并保存最佳模型
         if (epoch_val is not None) and (epoch % epoch_val == 0):
             val_res_src2tgt, val_res_tgt2src = utils.eval_psnr(val_loader, model_G_)
-            print('val_res_src2tgt:', val_res_src2tgt)
-            print('val_res_tgt2src:', val_res_tgt2src)
             log_info.append('val_src2tgt: psnr={:.4f}'.format(val_res_src2tgt))
             log_info.append('val_tgt2src: psnr={:.4f}'.format(val_res_tgt2src))
-            
-            # 检查 src2tgt 的 PSNR 是否是历史最佳
+
+            # 检查并保存最佳 src2tgt 模型
             if val_res_src2tgt > max_val_v_src2tgt:
                 max_val_v_src2tgt = val_res_src2tgt
-                # 保存 src2tgt 最佳模型
                 torch.save(sv_file, os.path.join(save_path, 'epoch-best_src2tgt.pth'))
 
-            # 检查 tgt2src 的 PSNR 是否是历史最佳
+            # 检查并保存最佳 tgt2src 模型
             if val_res_tgt2src > max_val_v_tgt2src:
                 max_val_v_tgt2src = val_res_tgt2src
-                # 保存 tgt2src 最佳模型
                 torch.save(sv_file, os.path.join(save_path, 'epoch-best_tgt2src.pth'))
 
         t = timer.t()
@@ -386,11 +406,8 @@ def main(config_, save_path):
 
         log(', '.join(log_info))
 
-    print('yeah!!!!')
-
     # 关闭 writer
     writer.close()
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -406,14 +423,17 @@ if __name__ == '__main__':
         config = yaml.load(f, Loader=yaml.FullLoader)
         print('config loaded.')
 
+    ask_user = config.get('ask_user', False)  # 默认值为 False
     batch_size = config['train_dataset']['batch_size']
 
     save_name = args.name or '_' + args.config.split('/')[-1][:-len('.yaml')] + '_batch_size_' + str(batch_size)
     if args.tag:
         save_name += '_' + args.tag + '_batch_size_' + str(batch_size)
-    print('save_name:', save_name)
 
-    save_path = os.path.join('./save/train/Loss', save_name)
+    save_path = os.path.join('/public_bme/data/linxin_debug/Loss', save_name)
+    save_path = os.path.join(save_path,datetime.now().strftime("%Y%m%d_%H%M%S"))
+    # print('save_path:', save_path)
+
     os.makedirs(save_path, exist_ok=True)
 
     main(config, save_path)
