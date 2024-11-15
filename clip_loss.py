@@ -167,8 +167,6 @@ class CLIPLoss(torch.nn.Module):
         tgt_seq = tgt_seq / tgt_seq.norm(dim=-1, keepdim=True)
 
         image_features = self.get_image_features(img)
-
-        #logits_per_image = image_features @ tokens.T#TODO 乖乖 这里你明早一定要看一下 BERT处理text的步骤 token并不是sentence的feature
         tgt_seq = tgt_seq.reshape(tgt_seq.shape[0],tgt_seq.shape[2])
         logits_per_image = image_features @ tgt_seq.T
         return (1. - logits_per_image / 100).mean()

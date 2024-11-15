@@ -1,4 +1,4 @@
-resume: /public_bme/data/linxin_debug/Loss/_train_lccd_sr_batch_size_2/20241025_151214/epoch-last.pth
+resume: /public_bme/data/linxin_debug/Loss/for_debug_pth/_train_lccd_sr_batch_size_2/20241107_190328/epoch-20.pth
 ask_user: false  # 是否询问用户是否覆盖已有文件
 remove_save_path: false  # 是否删除已有文件
 
@@ -6,40 +6,69 @@ train_dataset:
   dataset:
     name: paired-image-folders
     args:
-      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_img.txt
-      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_img.txt
-      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_prompt.txt
-      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_prompt.txt
+#      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_img.txt
+#      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_img.txt
+#      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_prompt.txt
+#      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_prompt.txt
+      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality1_img.txt
+      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality2_img.txt
+      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality1_prompt.txt
+      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality2_prompt.txt
+
       repeat: 1
       cache: in_memory
-  wrapper:
+
+  # 前30个epoch使用的wrapper配置
+  wrapper_paired:
     name: sr-implicit-paired
     args:
-      # inp_size: 60
-#      scale_min: 1
-#      scale_max: 3
-      augment: true # 数据增强
+      augment: true
       sample_q: 8000
+      # 如果需要scale_min和scale_max可以取消注释
+      scale_min: 1
+      scale_max: 3
+
+  # 30个epoch后使用的wrapper配置
+  wrapper_full:
+    name: sr-implicit-full
+    args:
+      augment: true
+      sample_q: 8000
+
   batch_size: 2
 
 val_dataset:
   dataset:
     name: paired-image-folders
     args:
-      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_img.txt
-      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_img.txt
-      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_prompt.txt
-      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_prompt.txt
+#      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val/val_T1_img.txt
+#      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val/val_SWI_img.txt
+#      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val/val_T1_prompt.txt
+#      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val/val_SWI_prompt.txt
+      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality1_img.txt
+      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality2_img.txt
+      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality1_prompt.txt
+      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality2_prompt.txt
       repeat: 1
       cache: in_memory
-  wrapper:
+
+  # 前500个epoch使用的wrapper配置
+  wrapper_paired:
     name: sr-implicit-paired
     args:
-      #inp_size:
-#      scale_min: 1
-#      scale_max: 3
       augment: true
       sample_q: 8000
+      # 如果需要scale_min和scale_max可以取消注释
+      scale_min: 1
+      scale_max: 3
+
+  # 500个epoch后使用的wrapper配置
+  wrapper_full:
+    name: sr-implicit-full
+    args:
+      augment: true
+      sample_q: 8000
+
   batch_size: 2
 
 
@@ -69,9 +98,11 @@ optimizer_D: # 判别器
   args:
     lr: 1.e-4
 
-epoch_max: 500
+epoch_max: 550
+epoch_threshold: 500
+
 multi_step_lr:
-  milestones: [100, 220, 300, 350, 400]
+  milestones: [100, 220, 300, 350, 400, 500]
   gamma: 0.5
 
 

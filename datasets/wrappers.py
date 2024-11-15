@@ -4,7 +4,7 @@ from datasets import register
 import numpy as np
 import utils
 
-@register('sr-implicit-paired')  # 使用register装饰器注册类名为'sr-implicit-paired'
+@register('sr-implicit-full')  # 使用register装饰器注册类名为'sr-implicit-full'
 class SRImplicitPairedFull(Dataset):  # 修改类名
     '''读取整张图像及对应文本的Dataset类'''
 
@@ -34,8 +34,9 @@ class SRImplicitPairedFull(Dataset):  # 修改类名
         }
 
 
-'''
+
 # 原始代码：带有随机裁剪
+@register('sr-implicit-paired')
 class SRImplicitPaired(Dataset):  # 定义SRImplicitPaired类，继承自Dataset
 
     def __init__(self, dataset, scale_min=1, scale_max=None, augment=False, sample_q=None):  # 初始化方法
@@ -70,5 +71,4 @@ class SRImplicitPaired(Dataset):  # 定义SRImplicitPaired类，继承自Dataset
             'seq_src': seq_src,
             'seq_tgt': seq_tgt
         }
-'''
 

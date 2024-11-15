@@ -68,11 +68,11 @@ def visualize_nii_file(nii_file_path, output_dir, type_suffix=""):
 
 if __name__ == "__main__":
     # 输入要可视化的.nii.gz文件路径
-    nii_pre_T1 = '/home_data/home/linxin2024/code/3DMedDM_v2/save/demo/T12SWI_0.nii.gz'
-    nii_pre_SWI = '/home_data/home/linxin2024/code/3DMedDM_v2/save/demo/SWI2T1_0.nii.gz'
+    nii_pre_T1 = '/home_data/home/linxin2024/code/3DMedDM_v2/save/demo/clip_L1_loss/T12SWI_0.nii.gz'
+    nii_pre_SWI = '/home_data/home/linxin2024/code/3DMedDM_v2/save/demo/clip_L1_loss/SWI2T1_0.nii.gz'
     nii_T1 = '/public_bme/data/ylwang/OASIS_clip/T1_brain/OAS30726_MR_d0061.nii.gz'
     nii_SWI = '/public_bme/data/ylwang/OASIS_clip/SWI_brain/OAS30726_MR_d0061.nii.gz'
-    output_dir = '/home_data/home/linxin2024/code/3DMedDM_v2/lx/output_slices'
+    output_dir = '/home_data/home/linxin2024/code/3DMedDM_v2/lx/output_slices/550epoch'
 
     # 可视化并保存每个文件的切片图像，添加文件类型后缀
     visualize_nii_file(nii_pre_T1, output_dir, type_suffix="_pred")

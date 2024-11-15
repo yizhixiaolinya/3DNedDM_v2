@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
 #SBATCH -t 5-00:00:00
-#SBATCH --output=/home_data/home/linxin2024/code/3DMedDM_v2/save/bash/train_loss.out
+#SBATCH --output=/home_data/home/linxin2024/code/3DMedDM_v2/save/bash/run_train.out
 
 # 创建日志目录（如果不存在）
 mkdir -p /home_data/home/linxin2024/code/3DMedDM_v2/save/bash
@@ -20,4 +20,4 @@ source /home_data/home/linxin2024/anaconda3/bin/activate synthesis
 cd /home_data/home/linxin2024/code/3DMedDM_v2
 
 # 执行任务
-srun python train_mine.py --config configs/train_lccd_sr.yaml
+srun python train_mine.py --config configs/train_lccd_sr.yaml 

@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
 #SBATCH -t 5-00:00:00
-#SBATCH --output=/home_data/home/linxin2024/code/3DMedDM_v2/save/bash/run_plot_demo.out
+#SBATCH --output=/home_data/home/linxin2024/code/3DMedDM_v2/save/bash/run_demo_s_t_overlap=0.75.out
 
 # 创建日志目录（如果不存在）
 mkdir -p /home_data/home/linxin2024/code/3DMedDM_v2/save/bash

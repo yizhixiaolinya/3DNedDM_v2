@@ -12,6 +12,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+from itertools import product
 
 # add clip_loss
 import yaml
@@ -19,7 +20,7 @@ from CLIP.model import CLIP # 2D
 from utils_clip import load_config_file
 import torchvision.transforms as transforms
 
-def eval_psnr(loader, model):
+def eval_psnr(loader, model, epoch, patch_size, overlap_ratio, epoch_threshold):
     """评估模型信噪比"""
     model.eval()
     # 初始化度量函数和结果累加器
@@ -31,20 +32,166 @@ def eval_psnr(loader, model):
         for batch in tqdm(loader, leave=False, desc='val'):
             for k, v in batch.items():
                 batch[k] = v.cuda().float()
+
             seq_src = batch['seq_src']
             seq_tgt = batch['seq_tgt']
-            tgt_hr = batch['tgt_img']
-            src_hr = batch['src_img']
-            
-            pre_src_tgt, pre_tgt_src = model(src_hr, tgt_hr, seq_src, seq_tgt)
 
-            res0 = metric_fn(pre_src_tgt, tgt_hr)
-            res1 = metric_fn(pre_tgt_src, src_hr)
+            if epoch <= epoch_threshold:
+                tgt_hr = batch['tgt_hr']
+                src_hr = batch['src_hr']
+                pre_src_tgt, pre_tgt_src = model(src_hr, tgt_hr, seq_src, seq_tgt)
+
+            else:
+                tgt_hr = batch['tgt_img']
+                src_hr = batch['src_img']
+    
+                # 切分图像为 patch
+                src_patches, positions = slice_image(src_hr.cpu().numpy(), patch_size, overlap_ratio)
+                tgt_patches, _ = slice_image(tgt_hr.cpu().numpy(), patch_size, overlap_ratio)
+
+                num_patches = src_patches.size(0)
+
+                # 收集输出结果
+                pre_patches_src2tgt_list = []
+                pre_patches_tgt2src_list = []
+
+                # 处理每个patch的预测
+                for start_idx in range(0, num_patches):
+
+                    # patches：[k,2,32,32,32]
+                    # 获取当前批次的 patches
+                    src_patches_batch = src_patches[start_idx]
+                    tgt_patches_batch = tgt_patches[start_idx]
+
+                    seq_src = seq_src.reshape(seq_src.shape[0], 1, seq_src.shape[-1])
+                    seq_tgt = seq_tgt.reshape(seq_tgt.shape[0], 1, seq_tgt.shape[-1])
+                    pre_patches_batch_src2tgt, pre_patches_batch_tgt2src = model(src_patches_batch.cuda(), tgt_patches_batch.cuda(), seq_src, seq_tgt)
+
+                    if isinstance(pre_patches_batch_src2tgt, tuple):
+                        pre_patches_batch_src2tgt = pre_patches_batch_src2tgt[0]
+
+                    if isinstance(pre_patches_batch_tgt2src, tuple):
+                        pre_patches_batch_tgt2src = pre_patches_batch_tgt2src[0]
+                    pre_patches_src2tgt_list.append(pre_patches_batch_src2tgt.cpu())
+                    pre_patches_tgt2src_list.append(pre_patches_batch_tgt2src.cpu())
+                pre_patches_src2tgt = torch.cat(pre_patches_src2tgt_list, dim=0).cpu()
+                pre_patches_tgt2src = torch.cat(pre_patches_tgt2src_list, dim=0).cpu()
+
+                # 将所有的 patches 拼接成完整图像
+                pre_src_tgt = reconstruct_image(pre_patches_src2tgt, positions, src_hr.shape, patch_size, overlap_ratio)
+                pre_tgt_src = reconstruct_image(pre_patches_tgt2src, positions, tgt_hr.shape, patch_size, overlap_ratio)
+
+            res0 = metric_fn(pre_src_tgt.cuda(), tgt_hr.cuda())
+            res1 = metric_fn(pre_tgt_src.cuda(), src_hr.cuda())
 
             val_res0.add(res0.item(), src_hr.shape[0])
             val_res1.add(res1.item(), src_hr.shape[0])
 
     return val_res0.item(), val_res1.item()
+
+def calculate_patch_index(target_size, patch_size, overlap_ratio=0.25):
+    """计算每个维度的起始位置，确保覆盖整个图像"""
+    indices = []
+    for dim in range(3):
+        step = int(patch_size[dim] * (1 - overlap_ratio))
+        if step <= 0:
+            step = 1  # 防止步长为0
+        dim_indices = list(range(0, target_size[dim] - patch_size[dim] + 1, step))
+        if len(dim_indices) == 0 or dim_indices[-1] + patch_size[dim] < target_size[dim]:
+            dim_indices.append(target_size[dim] - patch_size[dim])
+        indices.append(dim_indices)
+    return list(product(*indices))  # 所有维度的组合
+
+def img_pad(img, target_shape):
+    current_shape = img.shape
+    pads = [(0, max(0, target_shape[i] - current_shape[i])) for i in range(len(target_shape))]
+    padded_img = np.pad(img, pads, mode='constant', constant_values=0)
+    current_shape_2 = padded_img.shape
+    crops = []
+    for i in range(len(target_shape)):
+        if current_shape_2[i] > target_shape[i]:
+            crops.append(
+                slice((current_shape_2[i] - target_shape[i]) // 2, (current_shape_2[i] + target_shape[i]) // 2))
+        else:
+            crops.append(slice(None))
+    cropped_img = padded_img[tuple(crops)]
+    return cropped_img
+
+def slice_image(img, patch_size, overlap=0.25):
+    """将整张3D图像切分为patch，确保所有patch尺寸一致"""
+    patches = []
+    positions = []
+    patch_indices = calculate_patch_index(img.shape[1:], patch_size, overlap_ratio=overlap)
+    for (i, j, k) in patch_indices:
+        patch = img[:, i:i + patch_size[0], j:j + patch_size[1], k:k + patch_size[2]]
+        for l in range(patch.shape[0]):
+            patch[l] = img_pad(patch[l], patch_size)
+        patches.append(torch.tensor(patch))
+        positions.append((i, j, k))# not considering the batch? TODO
+
+    patches_tensor = torch.stack(patches).float()
+    return patches_tensor, positions
+
+def reconstruct_image(patches, positions, imgs_shape, patch_size, overlap=0.25):
+    """将预测的patch重新拼接成完整的3D图像"""
+    # 初始化重构图像
+    recon = torch.zeros(imgs_shape)  # recon 和 count 保持在 CPU 上
+    count = torch.zeros(imgs_shape)  # 记录每个位置被覆盖的次数
+
+    for patch, (i, j, k) in zip(patches, positions):
+        # 确保 patch 不进入 cuda，保持在 CPU 上
+        # 添加 patch 到重构图像
+        recon[:,i:i + patch_size[0], j:j + patch_size[1], k:k + patch_size[2]] += patch
+        count[:,i:i + patch_size[0], j:j + patch_size[1], k:k + patch_size[2]] += 1
+
+    recon /= count  # 处理重叠区域的平均值
+    return recon
+
+def get_non_zero_random_crop(src_img, tgt_img, src2tgt_img, tgt2src_img, crop_size):
+    """
+    从源图像和目标图像中获取随机裁剪的块。
+
+    Args:
+    - src_img: 源图像，四维数组 [batch, H, W, D]
+    - tgt_img: 目标图像，四维数组 [batch, H, W, D]
+    - src2tgt_img: 预测图像
+    - tgt2src_img: 预测图像
+    - crop_size: 裁剪块的大小，默认为32
+
+    Returns:
+    - cropped_src: 裁剪后的源图像块
+    - cropped_tgt: 裁剪后的目标图像块
+    - cropped_src2tgt: 裁剪后的源到目标图像块
+    - cropped_tgt2src: 裁剪后的目标到源图像块
+    """
+    batch_size, h, w, d = src_img.shape
+
+    # 随机选择裁剪起始位置
+    h0 = random.randint(0, max(0, h - crop_size[0]))
+    w0 = random.randint(0, max(0, w - crop_size[1]))
+    d0 = random.randint(0, max(0, d - crop_size[2]))
+
+    # 裁剪大小为crop_size的块
+    cropped_src = src_img[:, h0:h0 + crop_size[0], w0:w0 + crop_size[1], d0:d0 + crop_size[2]]
+    cropped_tgt = tgt_img[:, h0:h0 + crop_size[0], w0:w0 + crop_size[1], d0:d0 + crop_size[2]]
+    cropped_src2tgt = src2tgt_img[:, h0:h0 + crop_size[0], w0:w0 + crop_size[1], d0:d0 + crop_size[2]]
+    cropped_tgt2src = tgt2src_img[:, h0:h0 + crop_size[0], w0:w0 + crop_size[1], d0:d0 + crop_size[2]]
+
+    return cropped_src, cropped_tgt, cropped_src2tgt, cropped_tgt2src
+
+def crop_img(images,crop_size):
+    H, W, D = images.shape[1], images.shape[2], images.shape[3]
+
+    start_h = (H - crop_size) // 2
+    start_w = (W - crop_size) // 2
+    start_d = (D - crop_size) // 2
+
+    # Perform the cropping by slicing
+    cropped_images = images[:,
+                     start_h:start_h + crop_size,
+                     start_w:start_w + crop_size,
+                     start_d:start_d + crop_size]
+    return cropped_images
 
 
 def percentile_clip(input_tensor, reference_tensor=None, p_min=0.01, p_max=99.9, strictlyPositive=True):
@@ -153,7 +300,7 @@ def ensure_path(path, remove=True, ask_user=False):
             os.makedirs(path)
     else:
         os.makedirs(path)
-    exit()
+
 def set_save_path(save_path, remove=True, ask_user=False):
     ensure_path(save_path, remove=remove, ask_user=ask_user)
     set_log_path(save_path)

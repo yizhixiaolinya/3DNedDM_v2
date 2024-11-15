@@ -1,4 +1,0 @@
-/home_data/home/linxin2024/code/3DMedDM_v2/data_try/train/T1_np/sub-049_T1w.nii.gz_brain.nii.gz.npy
-/home_data/home/linxin2024/code/3DMedDM_v2/data_try/train/T1_np/sub-052_T1w.nii.gz_brain.nii.gz.npy
-/home_data/home/linxin2024/code/3DMedDM_v2/data_try/train/T1_np/sub-053_T1w.nii.gz_brain.nii.gz.npy
-/home_data/home/linxin2024/code/3DMedDM_v2/data_try/train/T1_np/sub-054_T1w.nii.gz_brain.nii.gz.npy
