@@ -2,7 +2,7 @@
 #SBATCH -p bme_gpu
 #SBATCH --job-name=synthesis
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:NVIDIAA10080GBPCIe:1
+#SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4

@@ -1,6 +1,5 @@
 import copy
 
-
 models = {}
 
 
@@ -18,9 +17,15 @@ def make(model_spec, args=None, load_sd=False):
     else:
         model_args = model_spec['args']
     model = models[model_spec['name']](**model_args)
-    if load_sd:
-        if model_spec['name'] == 'lccd':
-            model.load_state_dict(model_spec['sd_G'])
-        else:
-            model.load_state_dict(model_spec['sd_D'])
+    # if load_sd:
+    #     if model_spec['name'] == 'lccd':
+    #         model.load_state_dict(model_spec['sd_G'])
+    #     else:
+    #         model.load_state_dict(model_spec['sd_D'])
+
+    if 'sd_G' in model_spec:  # 加载生成器权重
+        model.load_state_dict(model_spec['sd_G'])
+    elif 'sd_D' in model_spec:  # 加载判别器权重
+        model.load_state_dict(model_spec['sd_D'])
+
     return model

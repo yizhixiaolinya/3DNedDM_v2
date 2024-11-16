@@ -1,4 +1,7 @@
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 from models.cross_att import Basic_block
 from models.linear import Linear # 用于判别
 from models.diffusion import UNet, Diffusion # U-Net和 Diffusion
@@ -50,6 +53,7 @@ class NLayerDiscriminator(nn.Module):
     def __init__(self, in_dim=0, out_dim=0, hidden_list=[]):
         super().__init__()
         self.layers = Linear(in_dim=in_dim, out_dim=out_dim, hidden_list=hidden_list)
+        self.dim = in_dim
         """
         layers = []
         lastv = in_dim
@@ -64,8 +68,56 @@ class NLayerDiscriminator(nn.Module):
     """
     def forward(self, src_gen, tgt_gen):
         dim = src_gen.shape[1]
-        x = src_gen.reshape(-1, dim)
-        y = tgt_gen.reshape(-1, dim)
+        x = src_gen.reshape(-1,  self.dim)
+        y = tgt_gen.reshape(-1,  self.dim)
 
-        return self.layers(x).unsqueeze(-1), self.layers(y).unsqueeze(-1)
-       
+        # 待修改:返回判别器的输出(指维度长的tensor,内部存放是否一致的信息)
+        return self.layers(x).unsqueeze(-1), self.layers(y).unsqueeze(-1) 
+
+@register('MyDiscri')
+class Discriminator3D(nn.Module):
+    def __init__(self, input_shape):
+        super(Discriminator3D, self).__init__()
+
+        # Unpack the input_shape dictionary
+        in_channels = input_shape['channels'] * 2  # Double the channels for concatenated inputs
+        depth = input_shape['depth']
+        height = input_shape['height']
+        width = input_shape['width']
+
+        def discriminator_block(in_filters, out_filters, first_block=False):
+            layers = [
+                nn.Conv3d(in_filters, out_filters, kernel_size=3, stride=1, padding=1),
+                nn.LeakyReLU(0.2, inplace=True),
+            ]
+            if not first_block:
+                layers.insert(1, nn.BatchNorm3d(out_filters))
+            layers.extend([
+                nn.Conv3d(out_filters, out_filters, kernel_size=3, stride=2, padding=1),
+                nn.BatchNorm3d(out_filters),
+                nn.LeakyReLU(0.2, inplace=True),
+            ])
+            return layers
+
+        # Build layers
+        layers = []
+        in_filters = in_channels
+        for i, out_filters in enumerate([64, 128, 256, 512]):
+            layers.extend(discriminator_block(in_filters, out_filters, first_block=(i == 0)))
+            in_filters = out_filters
+
+        # Final output layer
+        d_size = depth // (2 ** 4)
+        h_size = height // (2 ** 4)
+        w_size = width // (2 ** 4)
+        self.model = nn.Sequential(
+            *layers,
+            nn.Flatten(),
+            nn.Linear(out_filters * d_size * h_size * w_size, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, img1, img2):
+        x = torch.cat((img1, img2), dim=1)  # Concatenate along the channel dimension
+        validity = self.model(x)
+        return validity  # Output: [batch_size, 1]

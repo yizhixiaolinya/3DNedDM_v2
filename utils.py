@@ -11,7 +11,8 @@ import random
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
+import torch.optim as optim
+from torch.autograd import Variable, grad
 from itertools import product
 
 # add clip_loss
@@ -23,6 +24,7 @@ import torchvision.transforms as transforms
 def eval_psnr(loader, model, epoch, patch_size, overlap_ratio, epoch_threshold):
     """评估模型信噪比"""
     model.eval()
+
     # 初始化度量函数和结果累加器
     metric_fn = calc_psnr
     val_res1 = Averager()
@@ -72,8 +74,10 @@ def eval_psnr(loader, model, epoch, patch_size, overlap_ratio, epoch_threshold):
 
                     if isinstance(pre_patches_batch_tgt2src, tuple):
                         pre_patches_batch_tgt2src = pre_patches_batch_tgt2src[0]
+
                     pre_patches_src2tgt_list.append(pre_patches_batch_src2tgt.cpu())
                     pre_patches_tgt2src_list.append(pre_patches_batch_tgt2src.cpu())
+
                 pre_patches_src2tgt = torch.cat(pre_patches_src2tgt_list, dim=0).cpu()
                 pre_patches_tgt2src = torch.cat(pre_patches_tgt2src_list, dim=0).cpu()
 
@@ -415,3 +419,4 @@ class GANLoss(nn.Module):
     def __call__(self, input, target_is_real):
         target_tensor = self.get_target_tensor(input, target_is_real)
         return self.loss(input, target_tensor)
+    

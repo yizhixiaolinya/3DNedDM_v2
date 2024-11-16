@@ -1,4 +1,4 @@
-resume: /public_bme/data/linxin_debug/Loss/for_debug_pth/_train_lccd_sr_batch_size_2/20241107_190328/epoch-20.pth
+# resume: /public_bme/data/linxin_debug/Loss/for_debug_pth/_train_lccd_sr_batch_size_2/20241107_190328/epoch-20.pth
 ask_user: false  # 是否询问用户是否覆盖已有文件
 remove_save_path: false  # 是否删除已有文件
 
@@ -6,14 +6,14 @@ train_dataset:
   dataset:
     name: paired-image-folders
     args:
-#      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_img.txt
-#      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_img.txt
-#      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_T1_prompt.txt
-#      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train/train_SWI_prompt.txt
-      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality1_img.txt
-      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality2_img.txt
-      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality1_prompt.txt
-      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality2_prompt.txt
+      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train_few/train_T1_img.txt
+      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train_few/train_SWI_img.txt
+      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train_few/train_T1_prompt.txt
+      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train_few/train_SWI_prompt.txt
+      # root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality1_img.txt
+      # root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality2_img.txt
+      # prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality1_prompt.txt
+      # prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/train/modality2_prompt.txt
 
       repeat: 1
       cache: in_memory
@@ -41,24 +41,23 @@ val_dataset:
   dataset:
     name: paired-image-folders
     args:
-#      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val/val_T1_img.txt
-#      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val/val_SWI_img.txt
-#      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val/val_T1_prompt.txt
-#      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val/val_SWI_prompt.txt
-      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality1_img.txt
-      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality2_img.txt
-      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality1_prompt.txt
-      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality2_prompt.txt
+      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val_few/val_T1_img.txt
+      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val_few/val_SWI_img.txt
+      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val_few/val_T1_prompt.txt
+      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val_few/val_SWI_prompt.txt
+      # root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality1_img.txt
+      # root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality2_img.txt
+      # prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality1_prompt.txt
+      # prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/dataset_10_centers/all_paired/val/modality2_prompt.txt
       repeat: 1
       cache: in_memory
-
+      
   # 前500个epoch使用的wrapper配置
   wrapper_paired:
     name: sr-implicit-paired
     args:
       augment: true
       sample_q: 8000
-      # 如果需要scale_min和scale_max可以取消注释
       scale_min: 1
       scale_max: 3
 
@@ -82,30 +81,48 @@ model_G:
         #scale: 1
     no_imnet: False
 
+# model_D:
+#   name: NLDiscri
+#   args:
+#     in_dim: 8000
+#     out_dim: 864
+#     hidden_list: [256, 256, 256, 256]
+
 model_D:
-  name: NLDiscri
+  name: MyDiscri  # This should match the register name
   args:
-    in_dim: 8000
-    out_dim: 864
-    hidden_list: [256, 256, 256, 256]
+    input_shape:
+      channels: 1    # Number of channels in your input images (before concatenation)
+      depth: 32      # Depth of the 3D image patch
+      height: 32     # Height of the 3D image patch
+      width: 32      # Width of the 3D image patch
 
 optimizer_G: # 生成器
   name: adam
   args:
-    lr: 1.e-4
+    lr: 5.e-4
 optimizer_D: # 判别器
   name: adam
   args:
-    lr: 1.e-4
+    lr: 5.e-4
+
+use_auto_lr_scheduler: True
+
+lr_scheduler:
+  mode: max  # 因为 PSNR 越高越好
+  factor: 0.5
+  patience: 1
+  threshold: 0.1
+  cooldown: 1
+  min_lr: 1.e-6
+
+# 如果不使用自动调度器，使用 multi_step_lr 配置
+# multi_step_lr:
+#   milestones: [100, 220, 300, 350, 400, 500]
+#   gamma: 0.5
 
 epoch_max: 550
 epoch_threshold: 500
-
-multi_step_lr:
-  milestones: [100, 220, 300, 350, 400, 500]
-  gamma: 0.5
-
-
 epoch_val: 10
 epoch_save: 10
 
@@ -114,3 +131,9 @@ training_params:
   patch_size: [32, 32, 32]
   overlap_ratio: 0.25
   patch_batch_size: 32
+
+modalities:
+  - T1
+  - T2
+  - SWI
+  - FLAIR

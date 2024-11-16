@@ -1,0 +1,91 @@
+ask_user: false
+remove_save_path: false
+train_dataset:
+  dataset:
+    name: paired-image-folders
+    args:
+      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train_few/train_T1_img.txt
+      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train_few/train_SWI_img.txt
+      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train_few/train_T1_prompt.txt
+      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/train_few/train_SWI_prompt.txt
+      repeat: 1
+      cache: in_memory
+  wrapper_paired:
+    name: sr-implicit-paired
+    args:
+      augment: true
+      sample_q: 8000
+      scale_min: 1
+      scale_max: 3
+  wrapper_full:
+    name: sr-implicit-full
+    args:
+      augment: true
+      sample_q: 8000
+  batch_size: 2
+val_dataset:
+  dataset:
+    name: paired-image-folders
+    args:
+      root_path_1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val_few/val_T1_img.txt
+      root_path_2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val_few/val_SWI_img.txt
+      prompt_D1_M1: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val_few/val_T1_prompt.txt
+      prompt_D1_M2: /home_data/home/linxin2024/code/3DMedDM_v2/data_try_lx/val_few/val_SWI_prompt.txt
+      repeat: 1
+      cache: in_memory
+  wrapper_paired:
+    name: sr-implicit-paired
+    args:
+      augment: true
+      sample_q: 8000
+      scale_min: 1
+      scale_max: 3
+  wrapper_full:
+    name: sr-implicit-full
+    args:
+      augment: true
+      sample_q: 8000
+  batch_size: 2
+model_G:
+  name: lccd
+  args:
+    encoder_spec:
+      name: resencoder-256
+      args:
+        no_upsampling: true
+    no_imnet: false
+model_D:
+  name: MyDiscri
+  args:
+    input_shape:
+      channels: 1
+      depth: 32
+      height: 32
+      width: 32
+optimizer_G:
+  name: adam
+  args:
+    lr: 0.00025
+optimizer_D:
+  name: adam
+  args:
+    lr: 0.00025
+use_auto_lr_scheduler: true
+lr_scheduler:
+  mode: max
+  factor: 0.5
+  patience: 1
+  threshold: 0.1
+  cooldown: 1
+  min_lr: 1.0e-06
+epoch_max: 550
+epoch_threshold: 500
+epoch_val: 10
+epoch_save: 10
+training_params:
+  patch_size:
+  - 32
+  - 32
+  - 32
+  overlap_ratio: 0.25
+  patch_batch_size: 32
